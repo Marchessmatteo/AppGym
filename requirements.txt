@@ -1,5 +1,6 @@
-Streamlit
- Pandas
- Sqlalchemy
- Pymysql
- python-dotenv
+streamlit
+pandas
+sqlalchemy
+pymysql
+python-dotenv
+plotly
