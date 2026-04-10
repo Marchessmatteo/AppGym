@@ -86,6 +86,18 @@ obiettivi = {
 
 # --- 5. TITOLO E SELEZIONE GIORNO ---
 st.title("🏋️‍♂️ Il mio registro di allenamento")
+# --- LOGIN ---
+if 'autenticato' not in st.session_state:
+    st.session_state.autenticato = False
+
+if not st.session_state.autenticato:
+    password = st.text_input("🔒 Password", type="password")
+    if password == st.secrets["app_password"]:
+        st.session_state.autenticato = True
+        st.rerun()
+    elif password != "":
+        st.error("Password errata!")
+    st.stop()
 
 giorno_sel = st.selectbox("Seleziona Giorno", list(scheda.keys()))
 data_sel = st.date_input("Data", date.today())
