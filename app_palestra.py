@@ -457,3 +457,90 @@ try:
 
 except Exception as e:
     st.error(f"Errore: {e}")
+# --- 9. TRACCIAMENTO PESO CORPOREO ---
+st.divider()
+st.subheader("⚖️ Peso Corporeo")
+
+peso_obiettivo = 78.00  
+
+# Inserimento peso
+col_p1, col_p2 = st.columns(2)
+data_peso = col_p1.date_input("Data misurazione", date.today(), key="data_peso")
+peso_kg = col_p2.number_input("Peso (kg)", min_value=40.0, max_value=200.0, step=0.1, key="peso_kg")
+
+if st.button("SALVA PESO"):
+    with engine.connect() as conn:
+        conn.execute(sqlalchemy.text("""
+            INSERT INTO peso_corporeo (data_misurazione, peso_kg)
+            VALUES (:d, :p)
+        """), {"d": data_peso, "p": peso_kg})
+        conn.commit()
+    st.success("Peso salvato!")
+    st.rerun()
+
+# Grafico e statistiche
+try:
+    df_peso = pd.read_sql("""
+        SELECT data_misurazione, peso_kg 
+        FROM peso_corporeo 
+        ORDER BY data_misurazione ASC
+    """, engine)
+
+    if not df_peso.empty:
+        # Grafico
+        fig_peso = go.Figure()
+        fig_peso.add_trace(go.Scatter(
+            x=df_peso['data_misurazione'],
+            y=df_peso['peso_kg'],
+            mode='lines+markers',
+            name='Peso',
+            line=dict(color='#FF4B2B', width=2),
+            marker=dict(size=8)
+        ))
+        fig_peso.add_hline(
+            y=peso_obiettivo,
+            line_dash="dash",
+            line_color="#FFD700",
+            annotation_text=f"Obiettivo: {peso_obiettivo} kg",
+            annotation_position="top right"
+        )
+        fig_peso.update_layout(
+            plot_bgcolor='#0E1117',
+            paper_bgcolor='#0E1117',
+            font_color='#FFFFFF',
+            xaxis=dict(gridcolor='#333333'),
+            yaxis=dict(gridcolor='#333333'),
+        )
+        st.plotly_chart(fig_peso, use_container_width=True)
+
+        # Statistiche
+        peso_attuale = df_peso['peso_kg'].iloc[-1]
+        peso_iniziale = df_peso['peso_kg'].iloc[0]
+        kg_persi = peso_iniziale - peso_attuale
+        kg_mancanti = peso_attuale - peso_obiettivo
+
+        col_s1, col_s2, col_s3 = st.columns(3)
+        col_s1.metric("⚖️ Peso attuale", f"{peso_attuale} kg")
+        col_s2.metric("📉 Kg persi", f"{kg_persi:.1f} kg")
+        col_s3.metric("🎯 Al obiettivo", f"{kg_mancanti:.1f} kg")
+
+        # Stima data obiettivo
+        if len(df_peso) >= 2:
+            df_peso['data_misurazione'] = pd.to_datetime(df_peso['data_misurazione'])
+            df_peso['settimana'] = df_peso['data_misurazione'].dt.to_period('W')
+            df_sett_peso = df_peso.groupby('settimana')['peso_kg'].mean().reset_index()
+            variazione = df_sett_peso['peso_kg'].diff().dropna().mean()
+
+            if variazione < 0:
+                settimane_mancanti = kg_mancanti / abs(variazione)
+                data_obiettivo = date.today() + pd.Timedelta(weeks=settimane_mancanti)
+                st.success(f"🗓️ Se continui così raggiungi **{peso_obiettivo} kg** il **{data_obiettivo.strftime('%d %B %Y')}** — tra circa **{settimane_mancanti:.0f} settimane**!")
+            elif variazione > 0:
+                st.warning("⚠️ Il peso sta aumentando nelle ultime settimane!")
+            else:
+                st.info("📊 Il peso è stabile, continua a spingere!")
+    else:
+        st.info("Inserisci la prima misurazione!")
+
+except Exception as e:
+    st.error(f"Errore: {e}")
