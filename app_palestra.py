@@ -4,7 +4,6 @@ import sqlalchemy
 import plotly.graph_objects as go
 import os
 import time
-from dotenv import load_dotenv
 from datetime import date
 
 # --- 1. CONFIGURAZIONE PAGINA & STILE ---
@@ -86,6 +85,7 @@ obiettivi = {
 
 # --- 5. TITOLO E SELEZIONE GIORNO ---
 st.title("🏋️‍♂️ Il mio registro di allenamento")
+
 # --- LOGIN ---
 if 'autenticato' not in st.session_state:
     st.session_state.autenticato = False
@@ -232,7 +232,7 @@ else:
     st.divider()
     esercizio_sel = st.selectbox("Esercizio", scheda[giorno_sel])
 
-    # Promemoria ultimo carico per quell'esercizio
+    # Promemoria ultime serie per quell'esercizio
     try:
         query_last = sqlalchemy.text("""
             SELECT carico_kg, ripetizioni, data_allenamento
@@ -245,7 +245,24 @@ else:
             result_last = conn.execute(query_last, {"ex": esercizio_sel}).fetchone()
 
         if result_last:
-            st.info(f"💡 Ultima volta ({result_last[2]}): {result_last[0]} kg x {result_last[1]} reps")
+            query_ultime = sqlalchemy.text("""
+                SELECT serie_n, ripetizioni, carico_kg
+                FROM sessioni_allenamento
+                WHERE esercizio = :ex
+                AND data_allenamento = (
+                    SELECT MAX(data_allenamento)
+                    FROM sessioni_allenamento
+                    WHERE esercizio = :ex
+                )
+                ORDER BY serie_n ASC
+            """)
+            with engine.connect() as conn:
+                ultime_serie = conn.execute(query_ultime, {"ex": esercizio_sel}).fetchall()
+
+            testo = f"💡 Ultima volta ({result_last[2]}):\n"
+            for s in ultime_serie:
+                testo += f"Serie {s[0]}: {s[2]} kg x {s[1]} reps\n"
+            st.info(testo)
     except:
         pass
 
@@ -326,13 +343,15 @@ else:
 
             fig = go.Figure()
 
-            # Pallini rossi per ogni serie
+            # Pallini rossi per ogni serie con numero serie nel tooltip
             fig.add_trace(go.Scatter(
                 x=df_filt['data_allenamento'],
                 y=df_filt['carico_kg'],
                 mode='markers',
                 name='Serie',
-                marker=dict(color='#FF4B2B', size=8)
+                marker=dict(color='#FF4B2B', size=8),
+                text=df_filt['serie_n'].apply(lambda x: f"Serie {x}"),
+                hovertemplate='<b>%{text}</b><br>Kg: %{y}<br>Data: %{x}<extra></extra>'
             ))
 
             # Linea verde che collega i massimi per sessione
@@ -457,11 +476,12 @@ try:
 
 except Exception as e:
     st.error(f"Errore: {e}")
+
 # --- 9. TRACCIAMENTO PESO CORPOREO ---
 st.divider()
 st.subheader("⚖️ Peso Corporeo")
 
-peso_obiettivo = 78.00  
+peso_obiettivo = 78.0
 
 # Inserimento peso
 col_p1, col_p2 = st.columns(2)
@@ -481,13 +501,12 @@ if st.button("SALVA PESO"):
 # Grafico e statistiche
 try:
     df_peso = pd.read_sql("""
-        SELECT data_misurazione, peso_kg 
-        FROM peso_corporeo 
+        SELECT data_misurazione, peso_kg
+        FROM peso_corporeo
         ORDER BY data_misurazione ASC
     """, engine)
 
     if not df_peso.empty:
-        # Grafico
         fig_peso = go.Figure()
         fig_peso.add_trace(go.Scatter(
             x=df_peso['data_misurazione'],
@@ -513,7 +532,6 @@ try:
         )
         st.plotly_chart(fig_peso, use_container_width=True)
 
-        # Statistiche
         peso_attuale = df_peso['peso_kg'].iloc[-1]
         peso_iniziale = df_peso['peso_kg'].iloc[0]
         kg_persi = peso_iniziale - peso_attuale
@@ -524,7 +542,6 @@ try:
         col_s2.metric("📉 Kg persi", f"{kg_persi:.1f} kg")
         col_s3.metric("🎯 Al obiettivo", f"{kg_mancanti:.1f} kg")
 
-        # Stima data obiettivo
         if len(df_peso) >= 2:
             df_peso['data_misurazione'] = pd.to_datetime(df_peso['data_misurazione'])
             df_peso['settimana'] = df_peso['data_misurazione'].dt.to_period('W')
