@@ -38,7 +38,7 @@ st.markdown("""
 
 # --- 2. CONNESSIONE DATABASE ---
 engine = sqlalchemy.create_engine(
-    f"mysql+pymysql://{st.secrets['user']}:{st.secrets['pw']}@{st.secrets['host']}:{st.secrets['port']}/{st.secrets['db']}"
+    f"mysql+pymysql://{st.secrets['user']}:{st.secrets['pw']}@{st.secrets['host']}:{st.secrets['port']}/{st.secrets['db']}?ssl_disabled=false"
 )
 
 # --- 3. SCHEDA ALLENAMENTO ---
