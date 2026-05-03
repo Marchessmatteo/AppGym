@@ -36,6 +36,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+
 # --- 2. CONNESSIONE DATABASE ---
 engine = sqlalchemy.create_engine(
     f"mysql+pymysql://{st.secrets['user']}:{st.secrets['pw']}@{st.secrets['host']}:{st.secrets['port']}/{st.secrets['db']}"
