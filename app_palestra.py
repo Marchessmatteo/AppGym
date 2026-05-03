@@ -40,9 +40,10 @@ st.markdown("""
 # --- 2. CONNESSIONE DATABASE ---
 engine = sqlalchemy.create_engine(
     f"mysql+pymysql://{st.secrets['user']}:{st.secrets['pw']}@{st.secrets['host']}:{st.secrets['port']}/{st.secrets['db']}",
-    pool_size=2,
+    pool_size=1,
     max_overflow=0,
-    pool_recycle=300
+    pool_recycle=60,
+    pool_pre_ping=True
 )
 
 # --- 3. SCHEDA ALLENAMENTO ---
