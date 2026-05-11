@@ -43,21 +43,21 @@ engine = sqlalchemy.create_engine(
 
 # --- 3. SCHEDA ALLENAMENTO ---
 scheda = {
-    "Giorno 1": [
+    "POWER & POSTERIOR": [
         "BattleRope",
         "Power Clean 5x5",
         "Affondi Manubri 3x20",
         "Trazioni Sbarra 4xmax",
         "Scaletta Agilità 5min"
     ],
-    "Giorno 2": [
+    "UPPER EXPLOSION": [
         "Push-up Esplosivi 4x8",
         "Military Press 4x6",
         "Dip Parallele 4x10",
         "Rematore Bilanciere 4x8",
         "BattleRope"
     ],
-    "Giorno 3": [
+    "HYBRID AGILITY": [
         "Squat Bilanciere 4x8",
         "Burpees 3x12",
         "Trazioni Presa Inversa 3xmax",
@@ -65,7 +65,7 @@ scheda = {
         "Scaletta + Scatto",
         "PLUNK1 + legraises15 + russian twist20"
     ],
-    "Giorno 4": ["Corsa"],
+    "Corsa": ["Corsa"],
     "Giorno Jolly": ["Esercizio Libero"]
 }
 
