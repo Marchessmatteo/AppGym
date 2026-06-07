@@ -46,48 +46,49 @@ engine = get_engine()
 
 # --- 3. SCHEDA ALLENAMENTO ---
 scheda = {
-    "POWER & POSTERIOR": [
-        "BattleRope",
+    "⚡ ESPLOSIVITÀ SUPERIORE": [
         "Power Clean 5x5",
-        "Affondi Manubri 3x20",
-        "Trazioni Sbarra 4xmax",
-        "Scaletta Agilità 5min"
-    ],
-    "UPPER EXPLOSION": [
-        "Push-up Esplosivi 4x8",
         "Military Press 4x6",
-        "Dip Parallele 4x10",
         "Rematore Bilanciere 4x8",
-        "BattleRope"
+        "Push-up Esplosivi 4x8",
+        "Plank 3 Appoggi"
     ],
-    "HYBRID AGILITY": [
+    "💪 FORZA GAMBE": [
         "Squat Bilanciere 4x8",
-        "Burpees 3x12",
-        "Trazioni Presa Inversa 3xmax",
-        "Affondi saltati 3x20",
-        "Scaletta + Scatto",
-        "PLUNK1 + legraises15 + russian twist20"
+        "Panca Piana Bilanciere",
+        "Trazioni Sbarra 4xmax",
+        "Affondi Posteriori Manubri",
+        "Copenhagen Plank"
     ],
     "Corsa": ["Corsa"],
     "Giorno Jolly": ["Esercizio Libero"]
 }
-
-# --- 4. OBIETTIVI FISSI PER ESERCIZIO (kg) ---
+# --- 4. NOTE ESERCIZI ---
+note_esercizi = {
+    "Power Clean 5x5": "4 serie × 4 reps | Carico: ~50-55 kg | Focus: massima velocità di spinta | Recupero: 2 min",
+    "Military Press 4x6": "4 serie × 6 reps | Carico: ~46-54 kg | Pesante controllato | Recupero: 2 min",
+    "Rematore Bilanciere 4x8": "4 serie × 8 reps | Carico: ~70-84 kg | Schiena forte | Recupero: 90 sec",
+    "Push-up Esplosivi 4x8": "3 serie × 6 reps | Stacca le mani da terra quando spingi | Recupero: 60 sec",
+    "Plank 3 Appoggi": "3 serie × 45 sec | Solleva un piede alla volta alternando | Recupero: 45 sec",
+    "Squat Bilanciere 4x8": "4 serie × 5 reps | Carico: ~75-80 kg | Tieni 2 rep di margine | Recupero: 2 min 30 sec",
+    "Panca Piana Bilanciere": "4 serie × 8 reps | Polso dritto e in linea col bilanciere | Recupero: 90 sec",
+    "Trazioni Sbarra 4xmax": "4 serie × max reps | Fermati 1-2 rep prima di cedere | Recupero: 90 sec",
+    "Affondi Posteriori Manubri": "3 serie × 8 reps per gamba | Carico medio-alto | In controllo | Recupero: 90 sec",
+    "Copenhagen Plank": "3 serie × 30 sec per lato | Gamba sopra appoggiata su panca | Recupero: 45 sec",
+}
+# --- 5. OBIETTIVI FISSI PER ESERCIZIO (kg) ---
 obiettivi = {
-    "Power Clean 5x5":              100.0,
-    "Squat Bilanciere 4x8":         100.0,
-    "Military Press 4x6":            80.0,
-    "Rematore Bilanciere 4x8":       80.0,
-    "Dip Parallele 4x10":            20.0,
-    "Trazioni Sbarra 4xmax":         10.0,
-    "Trazioni Presa Inversa 3xmax":  10.0,
-    "Push-up Esplosivi 4x8":         20.0,
-    "Affondi Manubri 3x20":          20.0,
-    "Affondi saltati 3x20":          20.0,
-    "Burpees 3x12":                  20.0,
+    "Power Clean":                   80.0,
+    "Squat Bilanciere":             100.0,
+    "Military Press Bilanciere":     50.0,
+    "Rematore Bilanciere":           80.0,
+    "Panca Piana Bilanciere":        80.0,
+    "Push-up Esplosivi":             20.0,
+    "Affondi Posteriori Manubri":    20.0,
+    "Trazioni Sbarra":               10.0,
 }
 
-# --- 5. TITOLO E LOGIN ---
+# --- 6. TITOLO E LOGIN ---
 st.title("🏋️‍♂️ Il mio registro di allenamento")
 
 if 'ruolo' not in st.session_state:
@@ -118,11 +119,11 @@ else:
 if 'guest_serie' not in st.session_state:
     st.session_state.guest_serie = []
 
-# --- 6. SELEZIONE GIORNO ---
-giorno_sel = st.selectbox("Seleziona Giorno", list(scheda.keys()))
+# --- 7. SELEZIONE GIORNO ---
+giorno_sel = st.selectbox("Seleziona Sessione", list(scheda.keys()))
 data_sel = st.date_input("Data", date.today())
 
-# --- 7. SEZIONE CORSA ---
+# --- 8. SEZIONE CORSA ---
 if giorno_sel == "Corsa":
     st.divider()
     st.subheader("🏃‍♂️ Tipo di Corsa")
@@ -260,7 +261,7 @@ if giorno_sel == "Corsa":
     except Exception as e:
         st.error(f"Errore: {e}")
 
-# --- 8. SEZIONE GIORNO JOLLY ---
+# --- 9. SEZIONE GIORNO JOLLY ---
 elif giorno_sel == "Giorno Jolly":
     st.divider()
     esercizio_sel = st.text_input("✏️ Nome Esercizio", placeholder="Es. Panca Piana, Leg Press...")
@@ -324,10 +325,14 @@ elif giorno_sel == "Giorno Jolly":
                 st.dataframe(pd.DataFrame(st.session_state.guest_serie), use_container_width=True)
             st.warning("👀 Guest: i dati spariscono alla chiusura del browser")
 
-# --- 9. SEZIONE PALESTRA ---
+# --- 10. SEZIONE PALESTRA ---
 else:
     st.divider()
     esercizio_sel = st.selectbox("Esercizio", scheda[giorno_sel])
+
+    # Box note esercizio
+    if esercizio_sel in note_esercizi:
+        st.info(f"📋 **{esercizio_sel}**\n\n{note_esercizi[esercizio_sel]}")
 
     try:
         with engine.connect() as conn:
@@ -485,7 +490,7 @@ else:
     except:
         st.info("Aggiungi dati per vedere i grafici.")
 
-# --- 10. GESTIONE CRONOLOGIA (solo Admin) ---
+# --- 11. GESTIONE CRONOLOGIA (solo Admin) ---
 if is_admin:
     st.divider()
     st.subheader("🗑️ Gestione Cronologia Selettiva")
@@ -516,7 +521,7 @@ if is_admin:
     except Exception as e:
         st.error(f"Errore: {e}")
 
-# --- 11. TRACCIAMENTO PESO CORPOREO ---
+# --- 12. TRACCIAMENTO PESO CORPOREO ---
 st.divider()
 st.subheader("⚖️ Peso Corporeo")
 
@@ -576,7 +581,5 @@ try:
                 st.info("📊 Il peso è stabile, continua a spingere!")
     else:
         st.info("Inserisci la prima misurazione!")
-except Exception as e:
-    st.error(f"Errore: {e}")
 except Exception as e:
     st.error(f"Errore: {e}")
