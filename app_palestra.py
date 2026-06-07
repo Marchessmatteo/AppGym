@@ -78,13 +78,12 @@ note_esercizi = {
 }
 # --- 5. OBIETTIVI FISSI PER ESERCIZIO (kg) ---
 obiettivi = {
-    "Power Clean":                   80.0,
+    "Power Clean 5x5":               80.0,
     "Squat Bilanciere":             100.0,
-    "Military Press Bilanciere":     50.0,
-    "Rematore Bilanciere":           80.0,
+    "Military Press 4x6":            50.0,
+    "Rematore Bilanciere 4x8":       80.0,
     "Panca Piana Bilanciere":        80.0,
-    "Push-up Esplosivi":             20.0,
-    "Affondi Posteriori Manubri":    20.0,
+     "Affondi Posteriori Manubri":   20.0,
     "Trazioni Sbarra":               10.0,
 }
 
