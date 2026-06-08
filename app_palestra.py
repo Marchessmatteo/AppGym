@@ -78,13 +78,13 @@ note_esercizi = {
 }
 # --- 5. OBIETTIVI FISSI PER ESERCIZIO (kg) ---
 obiettivi = {
-   "Power Clean 5x5":               80.0,
-    "Squat Bilanciere 4x8":          100.0,
-    "Military Press 4x6":            50.0,
-    "Rematore Bilanciere 4x8":       80.0,
-    "Panca Piana Bilanciere":        80.0,
-    "Affondi Posteriori Manubri":    20.0,
-    "Trazioni Sbarra 4xmax":         10.0,
+    "Power Clean 5x5":               60.0,   # era 80
+    "Squat Bilanciere 4x8":          80.0,   # era 100
+    "Military Press 4x6":            50.0,   # invariato
+    "Rematore Bilanciere 4x8":       70.0,   # era 80
+    "Panca Piana Bilanciere":        70.0,   # era 80
+    "Affondi Posteriori Manubri":    20.0,   # invariato
+    "Trazioni Sbarra 4xmax":         10.0,   # invariato
 }
 
 # --- 6. TITOLO E LOGIN ---
