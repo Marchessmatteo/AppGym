@@ -44,82 +44,209 @@ def get_engine():
 
 engine = get_engine()
 
-# --- 3. SCHEDA ALLENAMENTO ---
-scheda = {
-    "⚡ ESPLOSIVITÀ SUPERIORE": [
-        "Power Clean 5x5",
-        "Military Press 4x6",
-        "Rematore Bilanciere 4x8",
-        "Push-up Esplosivi 4x8",
-        "Plank 3 Appoggi"
-    ],
-    "💪 FORZA GAMBE": [
-        "Squat Bilanciere 4x8",
-        "Panca Piana Bilanciere",
-        "Trazioni Sbarra 4xmax",
-        "Affondi Posteriori Manubri",
-        "Copenhagen Plank"
-    ],
-    "Corsa": ["Corsa"],
-    "Giorno Jolly": ["Esercizio Libero"]
-}
-# --- 4. NOTE ESERCIZI ---
-note_esercizi = {
-    "Power Clean 5x5": "4 serie × 4 reps | Carico: ~50-55 kg | Focus: massima velocità di spinta | Recupero: 2 min",
-    "Military Press 4x6": "4 serie × 6 reps | Carico: ~46-54 kg | Pesante controllato | Recupero: 2 min",
-    "Rematore Bilanciere 4x8": "4 serie × 8 reps | Carico: ~70-84 kg | Schiena forte | Recupero: 90 sec",
-    "Push-up Esplosivi 4x8": "3 serie × 6 reps | Stacca le mani da terra quando spingi | Recupero: 60 sec",
-    "Plank 3 Appoggi": "3 serie × 45 sec | Solleva un piede alla volta alternando | Recupero: 45 sec",
-    "Squat Bilanciere 4x8": "4 serie × 5 reps | Carico: ~75-80 kg | Tieni 2 rep di margine | Recupero: 2 min 30 sec",
-    "Panca Piana Bilanciere": "4 serie × 8 reps | Polso dritto e in linea col bilanciere | Recupero: 90 sec",
-    "Trazioni Sbarra 4xmax": "4 serie × max reps | Fermati 1-2 rep prima di cedere | Recupero: 90 sec",
-    "Affondi Posteriori Manubri": "3 serie × 8 reps per gamba | Carico medio-alto | In controllo | Recupero: 90 sec",
-    "Copenhagen Plank": "3 serie × 30 sec per lato | Gamba sopra appoggiata su panca | Recupero: 45 sec",
-}
-# --- 5. OBIETTIVI FISSI PER ESERCIZIO (kg) ---
-obiettivi = {
-    "Power Clean 5x5":               60.0,   # era 80
-    "Squat Bilanciere 4x8":          80.0,   # era 100
-    "Military Press 4x6":            50.0,   # invariato
-    "Rematore Bilanciere 4x8":       70.0,   # era 80
-    "Panca Piana Bilanciere":        70.0,   # era 80
-    "Affondi Posteriori Manubri":    20.0,   # invariato
-    "Trazioni Sbarra 4xmax":         10.0,   # invariato
-}
-
-# --- 6. TITOLO E LOGIN ---
+# --- 6. TITOLO E LOGIN (nome utente + PIN) ---
 st.title("🏋️‍♂️ Il mio registro di allenamento")
 
-if 'ruolo' not in st.session_state:
-    st.session_state.ruolo = None
+if 'utente_id' not in st.session_state:
+    st.session_state.utente_id = None
+    st.session_state.nome_utente = None
 
-if st.session_state.ruolo is None:
-    st.write("### Accedi o continua come ospite")
-    password = st.text_input("🔒 Password Admin (lascia vuoto per Guest)", type="password")
-    col_login1, col_login2 = st.columns(2)
-    if col_login1.button("Accedi come Admin"):
-        if password == st.secrets["app_password"]:
-            st.session_state.ruolo = "admin"
-            st.rerun()
+if st.session_state.utente_id is None:
+    st.write("### Chi sei?")
+    nome_inserito = st.text_input("Nome utente")
+    pin_inserito = st.text_input("PIN (4 cifre)", type="password", max_chars=4)
+
+    if st.button("Entra"):
+        nome_pulito = nome_inserito.strip()
+        if nome_pulito == "" or pin_inserito == "":
+            st.error("Inserisci nome e PIN!")
+        elif not pin_inserito.isdigit() or len(pin_inserito) != 4:
+            st.error("Il PIN deve essere di 4 cifre numeriche!")
         else:
-            st.error("Password errata!")
-    if col_login2.button("Entra come Guest 👀"):
-        st.session_state.ruolo = "guest"
-        st.rerun()
+            with engine.connect() as conn:
+                risultato = conn.execute(sqlalchemy.text(
+                    "SELECT id, pin FROM Utenti WHERE nome_utente = :nome"
+                ), {"nome": nome_pulito}).fetchone()
+
+                if risultato:
+                    utente_id_trovato, pin_salvato = risultato
+                    if pin_salvato is None:
+                        conn.execute(sqlalchemy.text(
+                            "UPDATE Utenti SET pin = :pin WHERE id = :id"
+                        ), {"pin": pin_inserito, "id": utente_id_trovato})
+                        conn.commit()
+                        st.session_state.utente_id = utente_id_trovato
+                        st.session_state.nome_utente = nome_pulito
+                        st.rerun()
+                    elif pin_salvato == pin_inserito:
+                        st.session_state.utente_id = utente_id_trovato
+                        st.session_state.nome_utente = nome_pulito
+                        st.rerun()
+                    else:
+                        st.error("PIN errato!")
+                else:
+                    conn.execute(sqlalchemy.text(
+                        "INSERT INTO Utenti (nome_utente, pin) VALUES (:nome, :pin)"
+                    ), {"nome": nome_pulito, "pin": pin_inserito})
+                    conn.commit()
+                    nuovo = conn.execute(sqlalchemy.text(
+                        "SELECT id FROM Utenti WHERE nome_utente = :nome"
+                    ), {"nome": nome_pulito}).fetchone()
+                    st.session_state.utente_id = nuovo[0]
+                    st.session_state.nome_utente = nome_pulito
+                    st.rerun()
     st.stop()
 
-is_admin = st.session_state.ruolo == "admin"
+st.success(f"✅ Connesso come {st.session_state.nome_utente}")
 
-if is_admin:
-    st.success("👑 Modalità Admin")
-else:
-    st.info("👀 Modalità Guest — i dati non vengono salvati nel database")
+# --- 6.5 GESTIONE SCHEDE ---
+st.divider()
+with st.expander("📋 Le mie Schede"):
+    if 'creazione_scheda' not in st.session_state:
+        st.session_state.creazione_scheda = False
 
-if 'guest_serie' not in st.session_state:
-    st.session_state.guest_serie = []
+    if not st.session_state.creazione_scheda:
+        # --- Elenco schede esistenti ---
+        with engine.connect() as conn:
+            schede_utente = conn.execute(sqlalchemy.text("""
+                SELECT id, nome_scheda FROM Schede
+                WHERE utente_id = :uid
+                ORDER BY data_creazione DESC
+            """), {"uid": st.session_state.utente_id}).fetchall()
+
+        if schede_utente:
+            st.write("#### Schede salvate")
+            for scheda_id, nome in schede_utente:
+                with engine.connect() as conn:
+                    esercizi_scheda = conn.execute(sqlalchemy.text("""
+                        SELECT e.nome_esercizio, se.serie_n, se.ripetizioni, se.obiettivo_kg, se.note
+                        FROM Scheda_Esercizi se
+                        JOIN Esercizi e ON se.esercizio_id = e.id
+                        WHERE se.scheda_id = :sid
+                        ORDER BY se.ordine ASC
+                    """), {"sid": scheda_id}).fetchall()
+
+                col_nome, col_del = st.columns([4, 1])
+                col_nome.write(f"**{nome}**")
+                if col_del.button("🗑️", key=f"del_scheda_{scheda_id}"):
+                    with engine.connect() as conn:
+                        conn.execute(sqlalchemy.text(
+                            "DELETE FROM Scheda_Esercizi WHERE scheda_id = :sid"
+                        ), {"sid": scheda_id})
+                        conn.execute(sqlalchemy.text(
+                            "DELETE FROM Schede WHERE id = :sid AND utente_id = :uid"
+                        ), {"sid": scheda_id, "uid": st.session_state.utente_id})
+                        conn.commit()
+                    st.rerun()
+
+                for nome_es, serie_n, reps, obj_kg, note_es in esercizi_scheda:
+                    riga = f"　{nome_es} — {serie_n}x{reps}"
+                    if obj_kg:
+                        riga += f" | 🎯 {obj_kg} kg"
+                    if note_es:
+                        riga += f" | 📝 {note_es}"
+                    st.caption(riga)
+            st.divider()
+
+        # --- Pulsante crea nuova ---
+        if st.button("➕ Crea nuova scheda"):
+            st.session_state.creazione_scheda = True
+            st.session_state.esercizi_scheda_temp = []
+            st.rerun()
+    else:
+        st.write("### Nuova scheda")
+        nome_scheda = st.text_input("Nome scheda", placeholder="Es. Scheda A - Petto/Tricipiti", key="nome_nuova_scheda")
+
+        col_a, col_b = st.columns(2)
+        if col_a.button("✅ Continua"):
+            if nome_scheda.strip() == "":
+                st.error("Inserisci un nome per la scheda!")
+            else:
+                st.session_state.nome_scheda_temp = nome_scheda.strip()
+                st.rerun()
+        if col_b.button("❌ Annulla"):
+            st.session_state.creazione_scheda = False
+            st.rerun()
+
+        if 'nome_scheda_temp' in st.session_state:
+            st.success(f"Scheda: **{st.session_state.nome_scheda_temp}**")
+
+            st.write("#### Aggiungi esercizio")
+            with engine.connect() as conn:
+                lista_esercizi = conn.execute(sqlalchemy.text(
+                    "SELECT id, nome_esercizio FROM Esercizi ORDER BY nome_esercizio ASC"
+                )).fetchall()
+
+            opzioni_esercizi = {nome: id for id, nome in lista_esercizi}
+            esercizio_scelto = st.selectbox("Esercizio", list(opzioni_esercizi.keys()), key="sel_esercizio_scheda")
+
+            col_s, col_r = st.columns(2)
+            serie_target = col_s.number_input("Serie", 1, 10, 3, key="serie_target_scheda")
+            reps_target = col_r.number_input("Ripetizioni", 1, 50, 8, key="reps_target_scheda")
+
+            obiettivo_kg_input = st.number_input("Obiettivo Kg (opzionale)", 0.0, 300.0, 0.0, key="obiettivo_target_scheda")
+            note_input = st.text_input("Note (opzionale)", key="note_target_scheda")
+
+            if st.button("➕ Aggiungi alla scheda"):
+                st.session_state.esercizi_scheda_temp.append({
+                    "esercizio_id": opzioni_esercizi[esercizio_scelto],
+                    "nome": esercizio_scelto,
+                    "serie": serie_target,
+                    "reps": reps_target,
+                    "obiettivo": obiettivo_kg_input if obiettivo_kg_input > 0 else None,
+                    "note": note_input if note_input.strip() != "" else None
+                })
+                st.rerun()
+
+            if st.session_state.esercizi_scheda_temp:
+                st.write("#### Esercizi nella scheda")
+                for i, es in enumerate(st.session_state.esercizi_scheda_temp):
+                    st.write(f"{i+1}. **{es['nome']}** — {es['serie']}x{es['reps']}")
+
+                st.divider()
+                if st.button("💾 Salva Scheda Definitiva", type="primary"):
+                    with engine.connect() as conn:
+                        conn.execute(sqlalchemy.text("""
+                            INSERT INTO Schede (utente_id, nome_scheda)
+                            VALUES (:uid, :nome)
+                        """), {"uid": st.session_state.utente_id, "nome": st.session_state.nome_scheda_temp})
+                        conn.commit()
+
+                        nuova_scheda = conn.execute(sqlalchemy.text("""
+                            SELECT id FROM Schede
+                            WHERE utente_id = :uid AND nome_scheda = :nome
+                            ORDER BY id DESC LIMIT 1
+                        """), {"uid": st.session_state.utente_id, "nome": st.session_state.nome_scheda_temp}).fetchone()
+                        scheda_id = nuova_scheda[0]
+
+                        for ordine, es in enumerate(st.session_state.esercizi_scheda_temp, start=1):
+                            conn.execute(sqlalchemy.text("""
+                                INSERT INTO Scheda_Esercizi (scheda_id, esercizio_id, serie_n, ripetizioni, ordine, obiettivo_kg, note)
+                                VALUES (:sid, :eid, :s, :r, :o, :obj, :n)
+                            """), {"sid": scheda_id, "eid": es["esercizio_id"], "s": es["serie"], "r": es["reps"], "o": ordine, "obj": es["obiettivo"], "n": es["note"]})
+                        conn.commit()
+
+                    st.success("✅ Scheda salvata con successo!")
+                    st.session_state.creazione_scheda = False
+                    del st.session_state.nome_scheda_temp
+                    del st.session_state.esercizi_scheda_temp
+                    st.rerun()
 
 # --- 7. SELEZIONE GIORNO ---
-giorno_sel = st.selectbox("Seleziona Sessione", list(scheda.keys()))
+with engine.connect() as conn:
+    schede_disponibili = conn.execute(sqlalchemy.text("""
+        SELECT id, nome_scheda FROM Schede
+        WHERE utente_id = :uid
+        ORDER BY data_creazione DESC
+    """), {"uid": st.session_state.utente_id}).fetchall()
+
+mappa_schede = {nome: sid for sid, nome in schede_disponibili}
+opzioni_sessione = list(mappa_schede.keys()) + ["Corsa", "Giorno Jolly"]
+
+if not schede_disponibili:
+    st.info("💡 Non hai ancora creato schede — apri '📋 Le mie Schede' sopra per crearne una, oppure usa 'Giorno Jolly' per allenarti liberamente.")
+
+giorno_sel = st.selectbox("Seleziona Sessione", opzioni_sessione)
 data_sel = st.date_input("Data", date.today())
 
 # --- 8. SEZIONE CORSA ---
@@ -144,22 +271,20 @@ if giorno_sel == "Corsa":
         bpm = col4.number_input("BPM", 0, 220, 0, key="scatto_bpm")
         note = st.text_input("Note", key="scatto_note")
 
-        if is_admin:
+        if True:
             if st.button("SALVA SCATTO E AVANZA ➡️"):
                 with engine.connect() as conn:
                     conn.execute(sqlalchemy.text("""
                         INSERT INTO sessioni_corsa
-                            (data_allenamento, tipo_corsa, serie_n, metri, ritmo, bpm, note)
-                        VALUES (:d, :t, :s, :m, :r, :b, :n)
-                    """), {"d": data_sel, "t": tipo_corsa, "s": serie, "m": metri, "r": ritmo, "b": bpm if bpm > 0 else None, "n": note})
+                            (data_allenamento, tipo_corsa, serie_n, metri, ritmo, bpm, note, utente_id)
+                        VALUES (:d, :t, :s, :m, :r, :b, :n, :uid)
+                    """), {"d": data_sel, "t": tipo_corsa, "s": serie, "m": metri, "r": ritmo, "b": bpm if bpm > 0 else None, "n": note, "uid": st.session_state.utente_id})
                     conn.commit()
                 st.session_state.n_serie += 1
                 st.rerun()
             if st.button("Reset Scatto (Torna a 1)"):
                 st.session_state.n_serie = 1
                 st.rerun()
-        else:
-            st.warning("👀 Guest: il salvataggio è disabilitato")
 
     elif tipo_corsa == "Corsa Lunga":
         st.write("### 🏃 Corsa Lunga")
@@ -178,19 +303,17 @@ if giorno_sel == "Corsa":
             sec_r = int((ritmo_calc - min_r) * 60)
             st.metric("🏃 Ritmo calcolato", f"{min_r}:{sec_r:02d} min/km")
 
-        if is_admin:
+        if True:
             if st.button("SALVA CORSA LUNGA"):
                 with engine.connect() as conn:
                     conn.execute(sqlalchemy.text("""
                         INSERT INTO sessioni_corsa
-                            (data_allenamento, tipo_corsa, serie_n, metri, minuti, ritmo, bpm, note)
-                        VALUES (:d, :t, 1, :m, :min, :r, :b, :n)
-                    """), {"d": data_sel, "t": tipo_corsa, "m": metri, "min": minuti if minuti > 0 else None, "r": ritmo, "b": bpm if bpm > 0 else None, "n": note})
+                            (data_allenamento, tipo_corsa, serie_n, metri, minuti, ritmo, bpm, note, utente_id)
+                        VALUES (:d, :t, 1, :m, :min, :r, :b, :n, :uid)
+                    """), {"d": data_sel, "t": tipo_corsa, "m": metri, "min": minuti if minuti > 0 else None, "r": ritmo, "b": bpm if bpm > 0 else None, "n": note, "uid": st.session_state.utente_id})
                     conn.commit()
                 st.success("Corsa salvata!")
                 st.rerun()
-        else:
-            st.warning("👀 Guest: il salvataggio è disabilitato")
 
     elif tipo_corsa == "Ripetute 400m":
         st.write("### 🔄 Ripetute")
@@ -205,56 +328,54 @@ if giorno_sel == "Corsa":
         bpm = col4.number_input("BPM", 0, 220, 0, key="rip_bpm")
         note = st.text_input("Note", key="rip_note")
 
-        if is_admin:
+        if True:
             if st.button("SALVA RIPETUTA E AVANZA ➡️"):
                 with engine.connect() as conn:
                     conn.execute(sqlalchemy.text("""
                         INSERT INTO sessioni_corsa
-                            (data_allenamento, tipo_corsa, serie_n, metri, ritmo, bpm, note)
-                        VALUES (:d, :t, :s, :m, :r, :b, :n)
-                    """), {"d": data_sel, "t": tipo_corsa, "s": serie, "m": metri, "r": ritmo, "b": bpm if bpm > 0 else None, "n": note})
+                            (data_allenamento, tipo_corsa, serie_n, metri, ritmo, bpm, note, utente_id)
+                        VALUES (:d, :t, :s, :m, :r, :b, :n, :uid)
+                    """), {"d": data_sel, "t": tipo_corsa, "s": serie, "m": metri, "r": ritmo, "b": bpm if bpm > 0 else None, "n": note, "uid": st.session_state.utente_id})
                     conn.commit()
                 st.session_state.n_serie += 1
                 st.rerun()
             if st.button("Reset Ripetuta (Torna a 1)"):
                 st.session_state.n_serie = 1
                 st.rerun()
-        else:
-            st.warning("👀 Guest: il salvataggio è disabilitato")
 
     # --- Storico Corsa ---
     st.divider()
     st.subheader("📋 Storico Corsa")
     try:
         with engine.connect() as conn:
-            df_corse = pd.read_sql("""
+            df_corse = pd.read_sql(sqlalchemy.text("""
                 SELECT id, data_allenamento AS Data, tipo_corsa AS Tipo,
                        serie_n AS Serie, metri AS Metri, minuti AS Minuti,
                        ritmo AS Ritmo, bpm AS BPM, note AS Note
                 FROM sessioni_corsa
+                WHERE utente_id = :uid
                 ORDER BY data_allenamento DESC, serie_n ASC
                 LIMIT 30
-            """, conn)
+            """), conn, params={"uid": st.session_state.utente_id})
 
         if not df_corse.empty:
-            if is_admin:
-                df_corse.insert(0, "Seleziona", False)
-                modificato_corse = st.data_editor(
-                    df_corse, hide_index=True,
-                    column_config={"id": None, "Seleziona": st.column_config.CheckboxColumn()},
-                    disabled=["Data", "Tipo", "Serie", "Metri", "Minuti", "Ritmo", "BPM", "Note"],
-                    use_container_width=True, key="editor_corse"
-                )
-                ids_da_eliminare = modificato_corse[modificato_corse["Seleziona"] == True]["id"].tolist()
-                if ids_da_eliminare:
-                    if st.button(f"🗑️ ELIMINA {len(ids_da_eliminare)} RIGHE", type="primary", key="elimina_corse"):
-                        with engine.connect() as conn:
-                            for id_del in ids_da_eliminare:
-                                conn.execute(sqlalchemy.text("DELETE FROM sessioni_corsa WHERE id = :id"), {"id": id_del})
-                            conn.commit()
-                        st.rerun()
-            else:
-                st.dataframe(df_corse.drop(columns=["id"]), use_container_width=True)
+            df_corse.insert(0, "Seleziona", False)
+            modificato_corse = st.data_editor(
+                df_corse, hide_index=True,
+                column_config={"id": None, "Seleziona": st.column_config.CheckboxColumn()},
+                disabled=["Data", "Tipo", "Serie", "Metri", "Minuti", "Ritmo", "BPM", "Note"],
+                use_container_width=True, key="editor_corse"
+            )
+            ids_da_eliminare = modificato_corse[modificato_corse["Seleziona"] == True]["id"].tolist()
+            if ids_da_eliminare:
+                if st.button(f"🗑️ ELIMINA {len(ids_da_eliminare)} RIGHE", type="primary", key="elimina_corse"):
+                    with engine.connect() as conn:
+                        for id_del in ids_da_eliminare:
+                            conn.execute(sqlalchemy.text(
+                                "DELETE FROM sessioni_corsa WHERE id = :id AND utente_id = :uid"
+                            ), {"id": id_del, "uid": st.session_state.utente_id})
+                        conn.commit()
+                    st.rerun()
         else:
             st.info("Nessuna corsa registrata ancora.")
     except Exception as e:
@@ -271,19 +392,19 @@ elif giorno_sel == "Giorno Jolly":
                 result_last = conn.execute(sqlalchemy.text("""
                     SELECT carico_kg, ripetizioni, data_allenamento
                     FROM sessioni_allenamento
-                    WHERE esercizio = :ex
+                    WHERE esercizio = :ex AND utente_id = :uid
                     ORDER BY data_allenamento DESC, id DESC LIMIT 1
-                """), {"ex": esercizio_sel}).fetchone()
+                """), {"ex": esercizio_sel, "uid": st.session_state.utente_id}).fetchone()
 
             if result_last:
                 with engine.connect() as conn:
                     ultime_serie = conn.execute(sqlalchemy.text("""
                         SELECT serie_n, ripetizioni, carico_kg
                         FROM sessioni_allenamento
-                        WHERE esercizio = :ex
-                        AND data_allenamento = (SELECT MAX(data_allenamento) FROM sessioni_allenamento WHERE esercizio = :ex)
+                        WHERE esercizio = :ex AND utente_id = :uid
+                        AND data_allenamento = (SELECT MAX(data_allenamento) FROM sessioni_allenamento WHERE esercizio = :ex AND utente_id = :uid)
                         ORDER BY serie_n ASC
-                    """), {"ex": esercizio_sel}).fetchall()
+                    """), {"ex": esercizio_sel, "uid": st.session_state.utente_id}).fetchall()
                 testo = f"💡 Ultima volta ({result_last[2]}):\n"
                 for s in ultime_serie:
                     testo += f"Serie {s[0]}: {s[2]} kg x {s[1]} reps\n"
@@ -301,56 +422,64 @@ elif giorno_sel == "Giorno Jolly":
         carico = col5.number_input("Kg", 0.0, 300.0, 0.0)
         note   = st.text_input("Note (es. RPE)")
 
-        if is_admin:
+        if True:
             if st.button("SALVA SERIE E AVANZA ➡️"):
                 with engine.connect() as conn:
                     conn.execute(sqlalchemy.text("""
                         INSERT INTO sessioni_allenamento
-                            (data_allenamento, giorno_scheda, esercizio, serie_n, ripetizioni, carico_kg, note)
-                        VALUES (:d, :g, :es, :s, :r, :kg, :n)
-                    """), {"d": data_sel, "g": giorno_sel, "es": esercizio_sel, "s": serie, "r": reps, "kg": carico, "n": note})
+                            (data_allenamento, giorno_scheda, esercizio, serie_n, ripetizioni, carico_kg, note, utente_id)
+                        VALUES (:d, :g, :es, :s, :r, :kg, :n, :uid)
+                    """), {"d": data_sel, "g": giorno_sel, "es": esercizio_sel, "s": serie, "r": reps, "kg": carico, "n": note, "uid": st.session_state.utente_id})
                     conn.commit()
                 st.session_state.n_serie += 1
                 st.rerun()
             if st.button("Reset Serie (Torna a 1)"):
                 st.session_state.n_serie = 1
                 st.rerun()
-        else:
-            if st.button("AGGIUNGI SERIE (sessione temporanea) ➡️"):
-                st.session_state.guest_serie.append({"Esercizio": esercizio_sel, "Serie": serie, "Reps": reps, "Kg": carico, "Note": note})
-                st.session_state.n_serie += 1
-                st.rerun()
-            if st.session_state.guest_serie:
-                st.dataframe(pd.DataFrame(st.session_state.guest_serie), use_container_width=True)
-            st.warning("👀 Guest: i dati spariscono alla chiusura del browser")
 
-# --- 10. SEZIONE PALESTRA ---
+# --- 10. SEZIONE PALESTRA (scheda personalizzata) ---
 else:
     st.divider()
-    esercizio_sel = st.selectbox("Esercizio", scheda[giorno_sel])
+    scheda_id_sel = mappa_schede[giorno_sel]
 
-    # Box note esercizio
-    if esercizio_sel in note_esercizi:
-        st.info(f"📋 **{esercizio_sel}**\n\n{note_esercizi[esercizio_sel]}")
+    with engine.connect() as conn:
+        esercizi_scheda_sel = conn.execute(sqlalchemy.text("""
+            SELECT e.id, e.nome_esercizio, se.serie_n, se.ripetizioni, se.obiettivo_kg, se.note
+            FROM Scheda_Esercizi se
+            JOIN Esercizi e ON se.esercizio_id = e.id
+            WHERE se.scheda_id = :sid
+            ORDER BY se.ordine ASC
+        """), {"sid": scheda_id_sel}).fetchall()
+
+    mappa_esercizi_scheda = {nome: (eid, sn, rp, obj, nt) for eid, nome, sn, rp, obj, nt in esercizi_scheda_sel}
+    esercizio_sel = st.selectbox("Esercizio", list(mappa_esercizi_scheda.keys()))
+
+    _, serie_target_sel, reps_target_sel, obiettivo_sel, note_sel = mappa_esercizi_scheda[esercizio_sel]
+    info_testo = f"📋 **{esercizio_sel}** — target: {serie_target_sel}x{reps_target_sel}"
+    if obiettivo_sel:
+        info_testo += f" | 🎯 Obiettivo: {obiettivo_sel} kg"
+    if note_sel:
+        info_testo += f"\n\n📝 {note_sel}"
+    st.info(info_testo)
 
     try:
         with engine.connect() as conn:
             result_last = conn.execute(sqlalchemy.text("""
                 SELECT carico_kg, ripetizioni, data_allenamento
                 FROM sessioni_allenamento
-                WHERE esercizio = :ex
+                WHERE esercizio = :ex AND utente_id = :uid
                 ORDER BY data_allenamento DESC, id DESC LIMIT 1
-            """), {"ex": esercizio_sel}).fetchone()
+            """), {"ex": esercizio_sel, "uid": st.session_state.utente_id}).fetchone()
 
         if result_last:
             with engine.connect() as conn:
                 ultime_serie = conn.execute(sqlalchemy.text("""
                     SELECT serie_n, ripetizioni, carico_kg
                     FROM sessioni_allenamento
-                    WHERE esercizio = :ex
-                    AND data_allenamento = (SELECT MAX(data_allenamento) FROM sessioni_allenamento WHERE esercizio = :ex)
+                    WHERE esercizio = :ex AND utente_id = :uid
+                    AND data_allenamento = (SELECT MAX(data_allenamento) FROM sessioni_allenamento WHERE esercizio = :ex AND utente_id = :uid)
                     ORDER BY serie_n ASC
-                """), {"ex": esercizio_sel}).fetchall()
+                """), {"ex": esercizio_sel, "uid": st.session_state.utente_id}).fetchall()
             testo = f"💡 Ultima volta ({result_last[2]}):\n"
             for s in ultime_serie:
                 testo += f"Serie {s[0]}: {s[2]} kg x {s[1]} reps\n"
@@ -379,7 +508,7 @@ else:
         st.success("👊 TORNA A SPINGERE!")
 
     # --- Timer BattleRope ---
-    if esercizio_sel == "BattleRope":
+    if esercizio_sel == "Battle Rope":
         st.divider()
         st.write("### 🕒 Timer BattleRope")
         tempo_rope = st.slider("Seleziona Secondi", 5, 60, 30, key="slider_br")
@@ -402,35 +531,29 @@ else:
     carico = col5.number_input("Kg", 0.0, 300.0, 0.0)
     note   = st.text_input("Note (es. RPE)")
 
-    if is_admin:
+    if True:
         if st.button("SALVA SERIE E AVANZA ➡️"):
             with engine.connect() as conn:
                 conn.execute(sqlalchemy.text("""
                     INSERT INTO sessioni_allenamento
-                        (data_allenamento, giorno_scheda, esercizio, serie_n, ripetizioni, carico_kg, note)
-                    VALUES (:d, :g, :es, :s, :r, :kg, :n)
-                """), {"d": data_sel, "g": giorno_sel, "es": esercizio_sel, "s": serie, "r": reps, "kg": carico, "n": note})
+                        (data_allenamento, giorno_scheda, esercizio, serie_n, ripetizioni, carico_kg, note, utente_id)
+                    VALUES (:d, :g, :es, :s, :r, :kg, :n, :uid)
+                """), {"d": data_sel, "g": giorno_sel, "es": esercizio_sel, "s": serie, "r": reps, "kg": carico, "n": note, "uid": st.session_state.utente_id})
                 conn.commit()
             st.session_state.n_serie += 1
             st.rerun()
         if st.button("Reset Serie (Torna a 1)"):
             st.session_state.n_serie = 1
             st.rerun()
-    else:
-        if st.button("AGGIUNGI SERIE (sessione temporanea) ➡️"):
-            st.session_state.guest_serie.append({"Esercizio": esercizio_sel, "Serie": serie, "Reps": reps, "Kg": carico, "Note": note})
-            st.session_state.n_serie += 1
-            st.rerun()
-        if st.session_state.guest_serie:
-            st.dataframe(pd.DataFrame(st.session_state.guest_serie), use_container_width=True)
-        st.warning("👀 Guest: i dati spariscono alla chiusura del browser")
 
     # --- Grafico progressi ---
     st.divider()
     st.subheader("📈 Analisi Carichi")
     try:
         with engine.connect() as conn:
-            df_all = pd.read_sql("SELECT * FROM sessioni_allenamento", conn)
+            df_all = pd.read_sql(sqlalchemy.text(
+                "SELECT * FROM sessioni_allenamento WHERE utente_id = :uid"
+            ), conn, params={"uid": st.session_state.utente_id})
         if not df_all.empty:
             es_scelto = st.selectbox("Scegli esercizio da analizzare:", df_all['esercizio'].unique())
             df_filt = df_all[df_all['esercizio'] == es_scelto].sort_values('data_allenamento')
@@ -449,9 +572,12 @@ else:
                 mode='lines+markers', name='Massimo sessione',
                 line=dict(color='#00C853', width=2), marker=dict(color='#00C853', size=10)
             ))
-            if es_scelto in obiettivi and obiettivi[es_scelto] > 0:
-                fig.add_hline(y=obiettivi[es_scelto], line_dash="dash", line_color="#FFD700",
-                    annotation_text=f"Obiettivo: {obiettivi[es_scelto]:.0f} kg", annotation_position="top right")
+
+            if es_scelto in mappa_esercizi_scheda and mappa_esercizi_scheda[es_scelto][3]:
+                obiettivo_grafico = mappa_esercizi_scheda[es_scelto][3]
+                fig.add_hline(y=obiettivo_grafico, line_dash="dash", line_color="#FFD700",
+                    annotation_text=f"Obiettivo: {obiettivo_grafico:.0f} kg", annotation_position="top right")
+
             fig.update_layout(
                 plot_bgcolor='#0E1117', paper_bgcolor='#0E1117', font_color='#FFFFFF',
                 legend=dict(font=dict(color='#FFFFFF')),
@@ -459,15 +585,15 @@ else:
             )
             st.plotly_chart(fig, use_container_width=True)
 
-            if es_scelto in obiettivi and obiettivi[es_scelto] > 0:
+            if es_scelto in mappa_esercizi_scheda and mappa_esercizi_scheda[es_scelto][3]:
                 try:
+                    obiettivo_kg = mappa_esercizi_scheda[es_scelto][3]
                     df_filt['data_allenamento'] = pd.to_datetime(df_filt['data_allenamento'])
                     df_filt['settimana'] = df_filt['data_allenamento'].dt.to_period('W')
                     df_sett = df_filt.groupby('settimana')['carico_kg'].max().reset_index().sort_values('settimana').tail(4)
                     if len(df_sett) >= 2:
                         progressione    = df_sett['carico_kg'].diff().dropna().mean()
                         massimo_attuale = df_sett['carico_kg'].iloc[-1]
-                        obiettivo_kg    = obiettivi[es_scelto]
                         kg_mancanti     = obiettivo_kg - massimo_attuale
                         st.divider()
                         col_a, col_b, col_c = st.columns(3)
@@ -489,16 +615,18 @@ else:
     except:
         st.info("Aggiungi dati per vedere i grafici.")
 
-# --- 11. GESTIONE CRONOLOGIA (solo Admin) ---
-if is_admin:
+# --- 11. GESTIONE CRONOLOGIA ---
+if True:
     st.divider()
     st.subheader("🗑️ Gestione Cronologia Selettiva")
     try:
         with engine.connect() as conn:
-            df_last = pd.read_sql("""
+            df_last = pd.read_sql(sqlalchemy.text("""
                 SELECT id, data_allenamento, esercizio, serie_n, ripetizioni, carico_kg, note
-                FROM sessioni_allenamento ORDER BY id DESC LIMIT 20
-            """, conn)
+                FROM sessioni_allenamento
+                WHERE utente_id = :uid
+                ORDER BY id DESC LIMIT 20
+            """), conn, params={"uid": st.session_state.utente_id})
         if not df_last.empty:
             df_last.insert(0, "Seleziona", False)
             modificato = st.data_editor(
@@ -512,7 +640,9 @@ if is_admin:
                 if st.button(f"🗑️ ELIMINA {len(ids_da_eliminare)} RIGHE", type="primary", key="elimina_cronologia"):
                     with engine.connect() as conn:
                         for id_del in ids_da_eliminare:
-                            conn.execute(sqlalchemy.text("DELETE FROM sessioni_allenamento WHERE id = :id"), {"id": id_del})
+                            conn.execute(sqlalchemy.text(
+                                "DELETE FROM sessioni_allenamento WHERE id = :id AND utente_id = :uid"
+                            ), {"id": id_del, "uid": st.session_state.utente_id})
                         conn.commit()
                     st.rerun()
         else:
@@ -526,20 +656,24 @@ st.subheader("⚖️ Peso Corporeo")
 
 peso_obiettivo = 78.0
 
-if is_admin:
+if True:
     col_p1, col_p2 = st.columns(2)
     data_peso = col_p1.date_input("Data misurazione", date.today(), key="data_peso")
     peso_kg = col_p2.number_input("Peso (kg)", min_value=40.0, max_value=200.0, step=0.1, key="peso_kg")
     if st.button("SALVA PESO"):
         with engine.connect() as conn:
-            conn.execute(sqlalchemy.text("INSERT INTO peso_corporeo (data_misurazione, peso_kg) VALUES (:d, :p)"), {"d": data_peso, "p": peso_kg})
+            conn.execute(sqlalchemy.text(
+                "INSERT INTO peso_corporeo (data_misurazione, peso_kg, utente_id) VALUES (:d, :p, :uid)"
+            ), {"d": data_peso, "p": peso_kg, "uid": st.session_state.utente_id})
             conn.commit()
         st.success("Peso salvato!")
         st.rerun()
 
 try:
     with engine.connect() as conn:
-        df_peso = pd.read_sql("SELECT data_misurazione, peso_kg FROM peso_corporeo ORDER BY data_misurazione ASC", conn)
+        df_peso = pd.read_sql(sqlalchemy.text(
+            "SELECT data_misurazione, peso_kg FROM peso_corporeo WHERE utente_id = :uid ORDER BY data_misurazione ASC"
+        ), conn, params={"uid": st.session_state.utente_id})
     if not df_peso.empty:
         fig_peso = go.Figure()
         fig_peso.add_trace(go.Scatter(
