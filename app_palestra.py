@@ -10,9 +10,9 @@ st.set_page_config(page_title="Gym Tracker Pro", page_icon="🏋️‍♂️", l
 
 st.markdown("""
     <style>
-    .stApp { background-color: #0E1117; color: #FFFFFF; }
+    .stApp { background-color: #0B1120; color: #FFFFFF; }
     label, .stWidget label, div[data-testid="stWidgetLabel"] p {
-        color: #FF4B2B !important;
+        color: #3B82F6 !important;
         font-weight: bold !important;
         font-size: 18px !important;
     }
@@ -21,12 +21,13 @@ st.markdown("""
         background-color: #FFFFFF !important;
     }
     .stButton>button {
-        background-color: #FF4B2B !important;
+        background-color: #3B82F6 !important;
         color: white !important;
         font-weight: bold;
+        border: 1px solid #60A5FA !important;
     }
     .stProgress > div > div > div > div {
-        background-color: #FF4B2B !important;
+        background-color: #3B82F6 !important;
     }
     </style>
     """, unsafe_allow_html=True)
