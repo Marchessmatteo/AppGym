@@ -43,7 +43,20 @@ def get_engine():
         pool_pre_ping=True
     )
 
-engine = get_engine()
+engine = get_engine() 
+def zona_velocita(v):
+    if v is None or v <= 0:
+        return None
+    if v < 0.50:
+        return "🔴 Forza Assoluta (≥80-85% 1RM)"
+    elif v < 0.75:
+        return "🟠 Forza Accelerativa (65-85% 1RM)"
+    elif v < 1.00:
+        return "🟡 Forza-Velocità (50-65% 1RM)"
+    elif v < 1.30:
+        return "🟢 Velocità-Forza (35-50% 1RM)"
+    else:
+        return "🔵 Forza Iniziale (0-35% 1RM)"
 
 # --- 6. TITOLO E LOGIN (nome utente + PIN) ---
 st.title("🏋️‍♂️ Il mio registro di allenamento")
@@ -526,27 +539,41 @@ else:
     if 'n_serie' not in st.session_state:
         st.session_state.n_serie = 1
 
+    esercizi_salto = ["CMJ (Jump Squat)", "Box Jump", "Broad Jump", "Pogo Jumps"]
+
     col3, col4, col5 = st.columns(3)
     serie  = col3.number_input("Serie", 1, 30, step=1, key="input_serie", value=st.session_state.n_serie)
     reps   = col4.number_input("Reps", 1, 50, 8)
-    carico = col5.number_input("Kg", 0.0, 300.0, 0.0)
-    note   = st.text_input("Note (es. RPE)")
 
+    altezza = None
+    if esercizio_sel in esercizi_salto:
+        carico = 0.0
+        altezza = col5.number_input("Altezza/Distanza (cm)", 0.0, 400.0, 0.0, step=0.5)
+    else:
+        carico = col5.number_input("Kg", 0.0, 300.0, 0.0)
+
+    velocita = st.number_input("Velocità (m/s) - opzionale", 0.0, 3.0, 0.0, step=0.01, format="%.2f")
+    if velocita > 0:
+        zona = zona_velocita(velocita)
+        st.caption(f"Zona: {zona}")
+
+    note   = st.text_input("Note (es. RPE)")
+    
     if True:
         if st.button("SALVA SERIE E AVANZA ➡️"):
             with engine.connect() as conn:
                 conn.execute(sqlalchemy.text("""
                     INSERT INTO sessioni_allenamento
-                        (data_allenamento, giorno_scheda, esercizio, serie_n, ripetizioni, carico_kg, note, utente_id)
-                    VALUES (:d, :g, :es, :s, :r, :kg, :n, :uid)
-                """), {"d": data_sel, "g": giorno_sel, "es": esercizio_sel, "s": serie, "r": reps, "kg": carico, "n": note, "uid": st.session_state.utente_id})
+                        (data_allenamento, giorno_scheda, esercizio, serie_n, ripetizioni, carico_kg, note, utente_id, velocita_ms, altezza_cm)
+                    VALUES (:d, :g, :es, :s, :r, :kg, :n, :uid, :v, :alt)
+                """), {"d": data_sel, "g": giorno_sel, "es": esercizio_sel, "s": serie, "r": reps, "kg": carico, "n": note, "uid": st.session_state.utente_id, "v": velocita if velocita > 0 else None, "alt": altezza if altezza else None})
                 conn.commit()
             st.session_state.n_serie += 1
             st.rerun()
         if st.button("Reset Serie (Torna a 1)"):
             st.session_state.n_serie = 1
             st.rerun()
-
+            
     # --- Grafico progressi ---
     st.divider()
     st.subheader("📈 Analisi Carichi")
