@@ -43,7 +43,8 @@ def get_engine():
         pool_pre_ping=True
     )
 
-engine = get_engine() 
+engine = get_engine()
+
 def zona_velocita(v):
     if v is None or v <= 0:
         return None
@@ -120,7 +121,6 @@ with st.expander("📋 Le mie Schede"):
         st.session_state.creazione_scheda = False
 
     if not st.session_state.creazione_scheda:
-        # --- Elenco schede esistenti ---
         with engine.connect() as conn:
             schede_utente = conn.execute(sqlalchemy.text("""
                 SELECT id, nome_scheda FROM Schede
@@ -162,7 +162,6 @@ with st.expander("📋 Le mie Schede"):
                     st.caption(riga)
             st.divider()
 
-        # --- Pulsante crea nuova ---
         if st.button("➕ Crea nuova scheda"):
             st.session_state.creazione_scheda = True
             st.session_state.esercizi_scheda_temp = []
@@ -295,6 +294,9 @@ if giorno_sel == "Corsa":
                     """), {"d": data_sel, "t": tipo_corsa, "s": serie, "m": metri, "r": ritmo, "b": bpm if bpm > 0 else None, "n": note, "uid": st.session_state.utente_id})
                     conn.commit()
                 st.session_state.n_serie += 1
+                if st.session_state.n_serie > 30:
+                    st.session_state.n_serie = 1
+                st.session_state.scatto_n = st.session_state.n_serie
                 st.rerun()
             if st.button("Reset Scatto (Torna a 1)"):
                 st.session_state.n_serie = 1
@@ -352,6 +354,9 @@ if giorno_sel == "Corsa":
                     """), {"d": data_sel, "t": tipo_corsa, "s": serie, "m": metri, "r": ritmo, "b": bpm if bpm > 0 else None, "n": note, "uid": st.session_state.utente_id})
                     conn.commit()
                 st.session_state.n_serie += 1
+                if st.session_state.n_serie > 30:
+                    st.session_state.n_serie = 1
+                st.session_state.rip_n = st.session_state.n_serie
                 st.rerun()
             if st.button("Reset Ripetuta (Torna a 1)"):
                 st.session_state.n_serie = 1
@@ -446,6 +451,9 @@ elif giorno_sel == "Giorno Jolly":
                     """), {"d": data_sel, "g": giorno_sel, "es": esercizio_sel, "s": serie, "r": reps, "kg": carico, "n": note, "uid": st.session_state.utente_id})
                     conn.commit()
                 st.session_state.n_serie += 1
+                if st.session_state.n_serie > 30:
+                    st.session_state.n_serie = 1
+                st.session_state.input_serie = st.session_state.n_serie
                 st.rerun()
             if st.button("Reset Serie (Torna a 1)"):
                 st.session_state.n_serie = 1
@@ -558,7 +566,7 @@ else:
         st.caption(f"Zona: {zona}")
 
     note   = st.text_input("Note (es. RPE)")
-    
+
     if True:
         if st.button("SALVA SERIE E AVANZA ➡️"):
             with engine.connect() as conn:
@@ -569,11 +577,14 @@ else:
                 """), {"d": data_sel, "g": giorno_sel, "es": esercizio_sel, "s": serie, "r": reps, "kg": carico, "n": note, "uid": st.session_state.utente_id, "v": velocita if velocita > 0 else None, "alt": altezza if altezza else None})
                 conn.commit()
             st.session_state.n_serie += 1
+            if st.session_state.n_serie > 30:
+                st.session_state.n_serie = 1
+            st.session_state.input_serie = st.session_state.n_serie
             st.rerun()
         if st.button("Reset Serie (Torna a 1)"):
             st.session_state.n_serie = 1
             st.rerun()
-            
+
     # --- Grafico progressi ---
     st.divider()
     st.subheader("📈 Analisi Carichi")
@@ -586,13 +597,16 @@ else:
             es_scelto = st.selectbox("Scegli esercizio da analizzare:", df_all['esercizio'].unique())
             df_filt = df_all[df_all['esercizio'] == es_scelto].sort_values('data_allenamento')
 
+            velocita_testo = df_filt['velocita_ms'].apply(lambda v: f"{v} m/s" if pd.notna(v) else "n/d")
+
             fig = go.Figure()
             fig.add_trace(go.Scatter(
                 x=df_filt['data_allenamento'], y=df_filt['carico_kg'],
                 mode='markers', name='Serie',
-                marker=dict(color='#FF4B2B', size=8),
+                marker=dict(color='#3B82F6', size=8),
                 text=df_filt['serie_n'].apply(lambda x: f"Serie {x}"),
-                hovertemplate='<b>%{text}</b><br>Kg: %{y}<br>Data: %{x}<extra></extra>'
+                customdata=velocita_testo,
+                hovertemplate='<b>%{text}</b><br>Kg: %{y}<br>Velocità: %{customdata}<extra></extra>'
             ))
             df_max = df_filt.groupby('data_allenamento', as_index=False)['carico_kg'].max()
             fig.add_trace(go.Scatter(
@@ -602,20 +616,21 @@ else:
             ))
 
             if es_scelto in mappa_esercizi_scheda and mappa_esercizi_scheda[es_scelto][3]:
-                obiettivo_grafico = mappa_esercizi_scheda[es_scelto][3]
+                obiettivo_grafico = float(mappa_esercizi_scheda[es_scelto][3])
                 fig.add_hline(y=obiettivo_grafico, line_dash="dash", line_color="#FFD700",
                     annotation_text=f"Obiettivo: {obiettivo_grafico:.0f} kg", annotation_position="top right")
 
             fig.update_layout(
-                plot_bgcolor='#0E1117', paper_bgcolor='#0E1117', font_color='#FFFFFF',
+                plot_bgcolor='#0B1120', paper_bgcolor='#0B1120', font_color='#FFFFFF',
                 legend=dict(font=dict(color='#FFFFFF')),
-                xaxis=dict(gridcolor='#333333'), yaxis=dict(gridcolor='#333333'),
+                xaxis=dict(gridcolor='#333333', tickformat='%d/%m/%Y'),
+                yaxis=dict(gridcolor='#333333'),
             )
             st.plotly_chart(fig, use_container_width=True)
 
             if es_scelto in mappa_esercizi_scheda and mappa_esercizi_scheda[es_scelto][3]:
                 try:
-                    obiettivo_kg = mappa_esercizi_scheda[es_scelto][3]
+                    obiettivo_kg = float(mappa_esercizi_scheda[es_scelto][3])
                     df_filt['data_allenamento'] = pd.to_datetime(df_filt['data_allenamento'])
                     df_filt['settimana'] = df_filt['data_allenamento'].dt.to_period('W')
                     df_sett = df_filt.groupby('settimana')['carico_kg'].max().reset_index().sort_values('settimana').tail(4)
@@ -707,13 +722,13 @@ try:
         fig_peso.add_trace(go.Scatter(
             x=df_peso['data_misurazione'], y=df_peso['peso_kg'],
             mode='lines+markers', name='Peso',
-            line=dict(color='#FF4B2B', width=2), marker=dict(size=8)
+            line=dict(color='#3B82F6', width=2), marker=dict(size=8)
         ))
         fig_peso.add_hline(y=peso_obiettivo, line_dash="dash", line_color="#FFD700",
             annotation_text=f"Obiettivo: {peso_obiettivo} kg", annotation_position="top right")
         fig_peso.update_layout(
-            plot_bgcolor='#0E1117', paper_bgcolor='#0E1117', font_color='#FFFFFF',
-            xaxis=dict(gridcolor='#333333'), yaxis=dict(gridcolor='#333333'),
+            plot_bgcolor='#0B1120', paper_bgcolor='#0B1120', font_color='#FFFFFF',
+            xaxis=dict(gridcolor='#333333', tickformat='%d/%m/%Y'), yaxis=dict(gridcolor='#333333'),
         )
         st.plotly_chart(fig_peso, use_container_width=True)
 
