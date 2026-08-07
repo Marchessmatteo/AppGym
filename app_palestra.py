@@ -273,11 +273,11 @@ if giorno_sel == "Corsa":
 
     if tipo_corsa == "Scatti":
         st.write("### ⚡ Scatti")
-        if 'n_serie' not in st.session_state:
-            st.session_state.n_serie = 1
+        if 'scatto_n' not in st.session_state:
+            st.session_state.scatto_n = 1
 
         col1, col2 = st.columns(2)
-        serie = col1.number_input("Numero scatto", 1, 30, step=1, value=st.session_state.n_serie, key="scatto_n")
+        serie = col1.number_input("Numero scatto", 1, 30, step=1, key="scatto_n")
         metri = col2.number_input("Metri", 0, 500, 0, step=5, key="scatto_m")
         col3, col4 = st.columns(2)
         ritmo = col3.text_input("Ritmo (es. 4:30)", key="scatto_r")
@@ -293,13 +293,13 @@ if giorno_sel == "Corsa":
                         VALUES (:d, :t, :s, :m, :r, :b, :n, :uid)
                     """), {"d": data_sel, "t": tipo_corsa, "s": serie, "m": metri, "r": ritmo, "b": bpm if bpm > 0 else None, "n": note, "uid": st.session_state.utente_id})
                     conn.commit()
-                st.session_state.n_serie += 1
-                if st.session_state.n_serie > 30:
-                    st.session_state.n_serie = 1
-                st.session_state.scatto_n = st.session_state.n_serie
+                nuovo_valore = st.session_state.scatto_n + 1
+                if nuovo_valore > 30:
+                    nuovo_valore = 1
+                st.session_state.scatto_n = nuovo_valore
                 st.rerun()
             if st.button("Reset Scatto (Torna a 1)"):
-                st.session_state.n_serie = 1
+                st.session_state.scatto_n = 1
                 st.rerun()
 
     elif tipo_corsa == "Corsa Lunga":
@@ -333,11 +333,11 @@ if giorno_sel == "Corsa":
 
     elif tipo_corsa == "Ripetute 400m":
         st.write("### 🔄 Ripetute")
-        if 'n_serie' not in st.session_state:
-            st.session_state.n_serie = 1
+        if 'rip_n' not in st.session_state:
+            st.session_state.rip_n = 1
 
         col1, col2 = st.columns(2)
-        serie = col1.number_input("Numero ripetuta", 1, 30, step=1, value=st.session_state.n_serie, key="rip_n")
+        serie = col1.number_input("Numero ripetuta", 1, 30, step=1, key="rip_n")
         metri = col2.number_input("Metri", 0, 1000, 400, step=50, key="rip_m")
         col3, col4 = st.columns(2)
         ritmo = col3.text_input("Ritmo (es. 4:30)", key="rip_r")
@@ -353,13 +353,13 @@ if giorno_sel == "Corsa":
                         VALUES (:d, :t, :s, :m, :r, :b, :n, :uid)
                     """), {"d": data_sel, "t": tipo_corsa, "s": serie, "m": metri, "r": ritmo, "b": bpm if bpm > 0 else None, "n": note, "uid": st.session_state.utente_id})
                     conn.commit()
-                st.session_state.n_serie += 1
-                if st.session_state.n_serie > 30:
-                    st.session_state.n_serie = 1
-                st.session_state.rip_n = st.session_state.n_serie
+                nuovo_valore = st.session_state.rip_n + 1
+                if nuovo_valore > 30:
+                    nuovo_valore = 1
+                st.session_state.rip_n = nuovo_valore
                 st.rerun()
             if st.button("Reset Ripetuta (Torna a 1)"):
-                st.session_state.n_serie = 1
+                st.session_state.rip_n = 1
                 st.rerun()
 
     # --- Storico Corsa ---
@@ -432,11 +432,11 @@ elif giorno_sel == "Giorno Jolly":
             pass
 
         st.divider()
-        if 'n_serie' not in st.session_state:
-            st.session_state.n_serie = 1
+        if 'input_serie' not in st.session_state:
+            st.session_state.input_serie = 1
 
         col3, col4, col5 = st.columns(3)
-        serie  = col3.number_input("Serie", 1, 30, step=1, key="input_serie", value=st.session_state.n_serie)
+        serie  = col3.number_input("Serie", 1, 30, step=1, key="input_serie")
         reps   = col4.number_input("Reps", 1, 50, 8)
         carico = col5.number_input("Kg", 0.0, 300.0, 0.0)
         note   = st.text_input("Note (es. RPE)")
@@ -450,13 +450,13 @@ elif giorno_sel == "Giorno Jolly":
                         VALUES (:d, :g, :es, :s, :r, :kg, :n, :uid)
                     """), {"d": data_sel, "g": giorno_sel, "es": esercizio_sel, "s": serie, "r": reps, "kg": carico, "n": note, "uid": st.session_state.utente_id})
                     conn.commit()
-                st.session_state.n_serie += 1
-                if st.session_state.n_serie > 30:
-                    st.session_state.n_serie = 1
-                st.session_state.input_serie = st.session_state.n_serie
+                nuovo_valore = st.session_state.input_serie + 1
+                if nuovo_valore > 30:
+                    nuovo_valore = 1
+                st.session_state.input_serie = nuovo_valore
                 st.rerun()
             if st.button("Reset Serie (Torna a 1)"):
-                st.session_state.n_serie = 1
+                st.session_state.input_serie = 1
                 st.rerun()
 
 # --- 10. SEZIONE PALESTRA (scheda personalizzata) ---
@@ -544,13 +544,13 @@ else:
 
     # --- Inserimento serie ---
     st.divider()
-    if 'n_serie' not in st.session_state:
-        st.session_state.n_serie = 1
+    if 'input_serie' not in st.session_state:
+        st.session_state.input_serie = 1
 
     esercizi_salto = ["CMJ (Jump Squat)", "Box Jump", "Broad Jump", "Pogo Jumps"]
 
     col3, col4, col5 = st.columns(3)
-    serie  = col3.number_input("Serie", 1, 30, step=1, key="input_serie", value=st.session_state.n_serie)
+    serie  = col3.number_input("Serie", 1, 30, step=1, key="input_serie")
     reps   = col4.number_input("Reps", 1, 50, 8)
 
     altezza = None
@@ -576,13 +576,13 @@ else:
                     VALUES (:d, :g, :es, :s, :r, :kg, :n, :uid, :v, :alt)
                 """), {"d": data_sel, "g": giorno_sel, "es": esercizio_sel, "s": serie, "r": reps, "kg": carico, "n": note, "uid": st.session_state.utente_id, "v": velocita if velocita > 0 else None, "alt": altezza if altezza else None})
                 conn.commit()
-            st.session_state.n_serie += 1
-            if st.session_state.n_serie > 30:
-                st.session_state.n_serie = 1
-            st.session_state.input_serie = st.session_state.n_serie
+            nuovo_valore = st.session_state.input_serie + 1
+            if nuovo_valore > 30:
+                nuovo_valore = 1
+            st.session_state.input_serie = nuovo_valore
             st.rerun()
         if st.button("Reset Serie (Torna a 1)"):
-            st.session_state.n_serie = 1
+            st.session_state.input_serie = 1
             st.rerun()
 
     # --- Grafico progressi ---
