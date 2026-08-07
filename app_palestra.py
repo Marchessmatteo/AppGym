@@ -59,6 +59,19 @@ def zona_velocita(v):
     else:
         return "🔵 Forza Iniziale (0-35% 1RM)"
 
+def applica_valore_in_attesa(key_widget, key_pending):
+    """Se c'è un valore in attesa per questo contatore, lo applica PRIMA che il widget venga creato."""
+    if key_pending in st.session_state:
+        st.session_state[key_widget] = st.session_state.pop(key_pending)
+
+def avanza_contatore(key_widget, key_pending):
+    """Calcola il prossimo valore del contatore e lo mette in attesa per il prossimo giro."""
+    valore_attuale = st.session_state.get(key_widget, 1)
+    nuovo_valore = valore_attuale + 1
+    if nuovo_valore > 30:
+        nuovo_valore = 1
+    st.session_state[key_pending] = nuovo_valore
+
 # --- 6. TITOLO E LOGIN (nome utente + PIN) ---
 st.title("🏋️‍♂️ Il mio registro di allenamento")
 
@@ -273,6 +286,7 @@ if giorno_sel == "Corsa":
 
     if tipo_corsa == "Scatti":
         st.write("### ⚡ Scatti")
+        applica_valore_in_attesa("scatto_n", "_pending_scatto_n")
         if 'scatto_n' not in st.session_state:
             st.session_state.scatto_n = 1
 
@@ -293,13 +307,10 @@ if giorno_sel == "Corsa":
                         VALUES (:d, :t, :s, :m, :r, :b, :n, :uid)
                     """), {"d": data_sel, "t": tipo_corsa, "s": serie, "m": metri, "r": ritmo, "b": bpm if bpm > 0 else None, "n": note, "uid": st.session_state.utente_id})
                     conn.commit()
-                nuovo_valore = st.session_state.scatto_n + 1
-                if nuovo_valore > 30:
-                    nuovo_valore = 1
-                st.session_state.scatto_n = nuovo_valore
+                avanza_contatore("scatto_n", "_pending_scatto_n")
                 st.rerun()
             if st.button("Reset Scatto (Torna a 1)"):
-                st.session_state.scatto_n = 1
+                st.session_state["_pending_scatto_n"] = 1
                 st.rerun()
 
     elif tipo_corsa == "Corsa Lunga":
@@ -333,6 +344,7 @@ if giorno_sel == "Corsa":
 
     elif tipo_corsa == "Ripetute 400m":
         st.write("### 🔄 Ripetute")
+        applica_valore_in_attesa("rip_n", "_pending_rip_n")
         if 'rip_n' not in st.session_state:
             st.session_state.rip_n = 1
 
@@ -353,13 +365,10 @@ if giorno_sel == "Corsa":
                         VALUES (:d, :t, :s, :m, :r, :b, :n, :uid)
                     """), {"d": data_sel, "t": tipo_corsa, "s": serie, "m": metri, "r": ritmo, "b": bpm if bpm > 0 else None, "n": note, "uid": st.session_state.utente_id})
                     conn.commit()
-                nuovo_valore = st.session_state.rip_n + 1
-                if nuovo_valore > 30:
-                    nuovo_valore = 1
-                st.session_state.rip_n = nuovo_valore
+                avanza_contatore("rip_n", "_pending_rip_n")
                 st.rerun()
             if st.button("Reset Ripetuta (Torna a 1)"):
-                st.session_state.rip_n = 1
+                st.session_state["_pending_rip_n"] = 1
                 st.rerun()
 
     # --- Storico Corsa ---
@@ -432,6 +441,7 @@ elif giorno_sel == "Giorno Jolly":
             pass
 
         st.divider()
+        applica_valore_in_attesa("input_serie", "_pending_input_serie")
         if 'input_serie' not in st.session_state:
             st.session_state.input_serie = 1
 
@@ -450,13 +460,10 @@ elif giorno_sel == "Giorno Jolly":
                         VALUES (:d, :g, :es, :s, :r, :kg, :n, :uid)
                     """), {"d": data_sel, "g": giorno_sel, "es": esercizio_sel, "s": serie, "r": reps, "kg": carico, "n": note, "uid": st.session_state.utente_id})
                     conn.commit()
-                nuovo_valore = st.session_state.input_serie + 1
-                if nuovo_valore > 30:
-                    nuovo_valore = 1
-                st.session_state.input_serie = nuovo_valore
+                avanza_contatore("input_serie", "_pending_input_serie")
                 st.rerun()
             if st.button("Reset Serie (Torna a 1)"):
-                st.session_state.input_serie = 1
+                st.session_state["_pending_input_serie"] = 1
                 st.rerun()
 
 # --- 10. SEZIONE PALESTRA (scheda personalizzata) ---
@@ -544,6 +551,7 @@ else:
 
     # --- Inserimento serie ---
     st.divider()
+    applica_valore_in_attesa("input_serie", "_pending_input_serie")
     if 'input_serie' not in st.session_state:
         st.session_state.input_serie = 1
 
@@ -576,13 +584,10 @@ else:
                     VALUES (:d, :g, :es, :s, :r, :kg, :n, :uid, :v, :alt)
                 """), {"d": data_sel, "g": giorno_sel, "es": esercizio_sel, "s": serie, "r": reps, "kg": carico, "n": note, "uid": st.session_state.utente_id, "v": velocita if velocita > 0 else None, "alt": altezza if altezza else None})
                 conn.commit()
-            nuovo_valore = st.session_state.input_serie + 1
-            if nuovo_valore > 30:
-                nuovo_valore = 1
-            st.session_state.input_serie = nuovo_valore
+            avanza_contatore("input_serie", "_pending_input_serie")
             st.rerun()
         if st.button("Reset Serie (Torna a 1)"):
-            st.session_state.input_serie = 1
+            st.session_state["_pending_input_serie"] = 1
             st.rerun()
 
     # --- Grafico progressi ---
