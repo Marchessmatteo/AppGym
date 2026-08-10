@@ -412,7 +412,12 @@ if giorno_sel == "Corsa":
 # --- 9. SEZIONE GIORNO JOLLY ---
 elif giorno_sel == "Giorno Jolly":
     st.divider()
-    esercizio_sel = st.text_input("✏️ Nome Esercizio", placeholder="Es. Panca Piana, Leg Press...")
+    with engine.connect() as conn:
+        lista_esercizi_jolly = conn.execute(sqlalchemy.text(
+            "SELECT nome_esercizio FROM Esercizi ORDER BY nome_esercizio ASC"
+        )).fetchall()
+    opzioni_jolly = [nome[0] for nome in lista_esercizi_jolly]
+    esercizio_sel = st.selectbox("Esercizio", opzioni_jolly, key="esercizio_jolly_sel")
 
     if esercizio_sel:
         try:
@@ -473,23 +478,26 @@ else:
 
     with engine.connect() as conn:
         esercizi_scheda_sel = conn.execute(sqlalchemy.text("""
-            SELECT e.id, e.nome_esercizio, se.serie_n, se.ripetizioni, se.obiettivo_kg, se.note
+            SELECT e.id, e.nome_esercizio, se.serie_n, se.ripetizioni, se.obiettivo_kg, se.note, e.link_video
             FROM Scheda_Esercizi se
             JOIN Esercizi e ON se.esercizio_id = e.id
             WHERE se.scheda_id = :sid
             ORDER BY se.ordine ASC
         """), {"sid": scheda_id_sel}).fetchall()
 
-    mappa_esercizi_scheda = {nome: (eid, sn, rp, obj, nt) for eid, nome, sn, rp, obj, nt in esercizi_scheda_sel}
+    mappa_esercizi_scheda = {nome: (eid, sn, rp, obj, nt, video) for eid, nome, sn, rp, obj, nt, video in esercizi_scheda_sel}
     esercizio_sel = st.selectbox("Esercizio", list(mappa_esercizi_scheda.keys()))
 
-    _, serie_target_sel, reps_target_sel, obiettivo_sel, note_sel = mappa_esercizi_scheda[esercizio_sel]
+    _, serie_target_sel, reps_target_sel, obiettivo_sel, note_sel, video_sel = mappa_esercizi_scheda[esercizio_sel]
     info_testo = f"📋 **{esercizio_sel}** — target: {serie_target_sel}x{reps_target_sel}"
     if obiettivo_sel:
         info_testo += f" | 🎯 Obiettivo: {obiettivo_sel} kg"
     if note_sel:
         info_testo += f"\n\n📝 {note_sel}"
     st.info(info_testo)
+
+    if video_sel:
+        st.link_button("▶️ Guarda esecuzione", video_sel)
 
     try:
         with engine.connect() as conn:
