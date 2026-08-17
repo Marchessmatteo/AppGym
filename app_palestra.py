@@ -127,6 +127,35 @@ if st.session_state.utente_id is None:
 
 st.success(f"✅ Connesso come {st.session_state.nome_utente}")
 
+# --- 6.6 CHECK-IN SONNO GIORNALIERO ---
+with engine.connect() as conn:
+    sonno_oggi = conn.execute(sqlalchemy.text("""
+        SELECT ore_sonno FROM Sonno
+        WHERE utente_id = :uid AND data = :oggi
+    """), {"uid": st.session_state.utente_id, "oggi": date.today()}).fetchone()
+
+if sonno_oggi is None:
+    st.divider()
+    st.write("### 😴 Quante ore hai dormito stanotte?")
+    ore_sonno_input = st.number_input("Ore di sonno", 0.0, 14.0, 7.0, step=0.5, key="input_ore_sonno")
+
+    if st.button("Conferma"):
+        with engine.connect() as conn:
+            conn.execute(sqlalchemy.text("""
+                INSERT INTO Sonno (utente_id, data, ore_sonno)
+                VALUES (:uid, :oggi, :ore)
+            """), {"uid": st.session_state.utente_id, "oggi": date.today(), "ore": ore_sonno_input})
+            conn.commit()
+        st.rerun()
+else:
+    ore = float(sonno_oggi[0])
+    if ore >= 7:
+        st.success(f"💪 Hai dormito {ore}h — sei pronto, spingi forte oggi!")
+    elif ore >= 6:
+        st.info(f"😐 Hai dormito {ore}h — allenati normalmente, ma ascolta il corpo.")
+    else:
+        st.warning(f"⚠️ Hai dormito solo {ore}h — oggi vai con più cautela sui carichi.")
+
 # --- 6.5 GESTIONE SCHEDE ---
 st.divider()
 with st.expander("📋 Le mie Schede"):
