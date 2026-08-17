@@ -256,8 +256,19 @@ with st.expander("📋 Le mie Schede"):
             if st.session_state.esercizi_scheda_temp:
                 st.write("#### Esercizi nella scheda")
                 for i, es in enumerate(st.session_state.esercizi_scheda_temp):
-                    st.write(f"{i+1}. **{es['nome']}** — {es['serie']}x{es['reps']}")
+                    col_nome, col_s, col_r, col_del = st.columns([3, 1, 1, 1])
+                    col_nome.write(f"**{i+1}. {es['nome']}**")
 
+                    nuova_serie = col_s.number_input("S", 1, 10, es['serie'], key=f"edit_serie_{i}", label_visibility="collapsed")
+                    nuova_reps = col_r.number_input("R", 1, 50, es['reps'], key=f"edit_reps_{i}", label_visibility="collapsed")
+
+                    st.session_state.esercizi_scheda_temp[i]['serie'] = nuova_serie
+                    st.session_state.esercizi_scheda_temp[i]['reps'] = nuova_reps
+
+                    if col_del.button("🗑️", key=f"del_temp_{i}"):
+                        st.session_state.esercizi_scheda_temp.pop(i)
+                        st.rerun()
+                        
                 st.divider()
                 if st.button("💾 Salva Scheda Definitiva", type="primary"):
                     with engine.connect() as conn:
