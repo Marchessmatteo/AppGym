@@ -161,8 +161,11 @@ st.divider()
 with st.expander("📋 Le mie Schede"):
     if 'creazione_scheda' not in st.session_state:
         st.session_state.creazione_scheda = False
+    if 'modifica_scheda_id' not in st.session_state:
+        st.session_state.modifica_scheda_id = None
 
     if not st.session_state.creazione_scheda:
+        # --- Elenco schede esistenti ---
         with engine.connect() as conn:
             schede_utente = conn.execute(sqlalchemy.text("""
                 SELECT id, nome_scheda FROM Schede
@@ -175,15 +178,33 @@ with st.expander("📋 Le mie Schede"):
             for scheda_id, nome in schede_utente:
                 with engine.connect() as conn:
                     esercizi_scheda = conn.execute(sqlalchemy.text("""
-                        SELECT e.nome_esercizio, se.serie_n, se.ripetizioni, se.obiettivo_kg, se.note
+                        SELECT e.id, e.nome_esercizio, se.serie_n, se.ripetizioni, se.obiettivo_kg, se.note
                         FROM Scheda_Esercizi se
                         JOIN Esercizi e ON se.esercizio_id = e.id
                         WHERE se.scheda_id = :sid
                         ORDER BY se.ordine ASC
                     """), {"sid": scheda_id}).fetchall()
 
-                col_nome, col_del = st.columns([4, 1])
+                col_nome, col_mod, col_del = st.columns([3, 1, 1])
                 col_nome.write(f"**{nome}**")
+
+                if col_mod.button("✏️", key=f"mod_scheda_{scheda_id}"):
+                    st.session_state.modifica_scheda_id = scheda_id
+                    st.session_state.nome_scheda_temp = nome
+                    st.session_state.esercizi_scheda_temp = [
+                        {
+                            "esercizio_id": eid,
+                            "nome": enome,
+                            "serie": sn,
+                            "reps": rp,
+                            "obiettivo": float(obj) if obj else None,
+                            "note": nt
+                        }
+                        for eid, enome, sn, rp, obj, nt in esercizi_scheda
+                    ]
+                    st.session_state.creazione_scheda = True
+                    st.rerun()
+
                 if col_del.button("🗑️", key=f"del_scheda_{scheda_id}"):
                     with engine.connect() as conn:
                         conn.execute(sqlalchemy.text(
@@ -195,7 +216,7 @@ with st.expander("📋 Le mie Schede"):
                         conn.commit()
                     st.rerun()
 
-                for nome_es, serie_n, reps, obj_kg, note_es in esercizi_scheda:
+                for nome_es, serie_n, reps, obj_kg, note_es in [(r[1], r[2], r[3], r[4], r[5]) for r in esercizi_scheda]:
                     riga = f"　{nome_es} — {serie_n}x{reps}"
                     if obj_kg:
                         riga += f" | 🎯 {obj_kg} kg"
@@ -204,16 +225,26 @@ with st.expander("📋 Le mie Schede"):
                     st.caption(riga)
             st.divider()
 
+        # --- Pulsante crea nuova ---
         if st.button("➕ Crea nuova scheda"):
             st.session_state.creazione_scheda = True
+            st.session_state.modifica_scheda_id = None
             st.session_state.esercizi_scheda_temp = []
             st.rerun()
     else:
-        st.write("### Nuova scheda")
-        nome_scheda = st.text_input("Nome scheda", placeholder="Es. Scheda A - Petto/Tricipiti", key="nome_nuova_scheda")
+        in_modifica = st.session_state.modifica_scheda_id is not None
+        titolo = "Modifica scheda" if in_modifica else "Nuova scheda"
+        st.write(f"### {titolo}")
+
+        nome_scheda = st.text_input(
+            "Nome scheda",
+            value=st.session_state.get("nome_scheda_temp", ""),
+            placeholder="Es. Scheda A - Petto/Tricipiti",
+            key="nome_nuova_scheda"
+        )
 
         col_a, col_b = st.columns(2)
-        if col_a.button("✅ Continua"):
+        if col_a.button("✅ Continua" if not in_modifica else "✅ Conferma nome"):
             if nome_scheda.strip() == "":
                 st.error("Inserisci un nome per la scheda!")
             else:
@@ -221,6 +252,11 @@ with st.expander("📋 Le mie Schede"):
                 st.rerun()
         if col_b.button("❌ Annulla"):
             st.session_state.creazione_scheda = False
+            st.session_state.modifica_scheda_id = None
+            if 'nome_scheda_temp' in st.session_state:
+                del st.session_state.nome_scheda_temp
+            if 'esercizi_scheda_temp' in st.session_state:
+                del st.session_state.esercizi_scheda_temp
             st.rerun()
 
         if 'nome_scheda_temp' in st.session_state:
@@ -256,34 +292,58 @@ with st.expander("📋 Le mie Schede"):
             if st.session_state.esercizi_scheda_temp:
                 st.write("#### Esercizi nella scheda")
                 for i, es in enumerate(st.session_state.esercizi_scheda_temp):
-                    col_nome, col_s, col_r, col_del = st.columns([3, 1, 1, 1])
+                    col_nome, col_s2, col_r2, col_del2 = st.columns([3, 1, 1, 1])
                     col_nome.write(f"**{i+1}. {es['nome']}**")
 
-                    nuova_serie = col_s.number_input("S", 1, 10, es['serie'], key=f"edit_serie_{i}", label_visibility="collapsed")
-                    nuova_reps = col_r.number_input("R", 1, 50, es['reps'], key=f"edit_reps_{i}", label_visibility="collapsed")
+                    nuova_serie = col_s2.number_input("S", 1, 10, es['serie'], key=f"edit_serie_{i}", label_visibility="collapsed")
+                    nuova_reps = col_r2.number_input("R", 1, 50, es['reps'], key=f"edit_reps_{i}", label_visibility="collapsed")
 
                     st.session_state.esercizi_scheda_temp[i]['serie'] = nuova_serie
                     st.session_state.esercizi_scheda_temp[i]['reps'] = nuova_reps
 
-                    if col_del.button("🗑️", key=f"del_temp_{i}"):
+                    if col_del2.button("🗑️", key=f"del_temp_{i}"):
                         st.session_state.esercizi_scheda_temp.pop(i)
                         st.rerun()
-                        
-                st.divider()
-                if st.button("💾 Salva Scheda Definitiva", type="primary"):
-                    with engine.connect() as conn:
-                        conn.execute(sqlalchemy.text("""
-                            INSERT INTO Schede (utente_id, nome_scheda)
-                            VALUES (:uid, :nome)
-                        """), {"uid": st.session_state.utente_id, "nome": st.session_state.nome_scheda_temp})
-                        conn.commit()
 
-                        nuova_scheda = conn.execute(sqlalchemy.text("""
-                            SELECT id FROM Schede
-                            WHERE utente_id = :uid AND nome_scheda = :nome
-                            ORDER BY id DESC LIMIT 1
-                        """), {"uid": st.session_state.utente_id, "nome": st.session_state.nome_scheda_temp}).fetchone()
-                        scheda_id = nuova_scheda[0]
+                    col_obj, col_note = st.columns(2)
+                    nuovo_obj = col_obj.number_input(
+                        "Obiettivo Kg", 0.0, 300.0,
+                        float(es['obiettivo']) if es['obiettivo'] else 0.0,
+                        key=f"edit_obj_{i}"
+                    )
+                    nuova_nota = col_note.text_input(
+                        "Note", value=es['note'] if es['note'] else "",
+                        key=f"edit_nota_{i}"
+                    )
+                    st.session_state.esercizi_scheda_temp[i]['obiettivo'] = nuovo_obj if nuovo_obj > 0 else None
+                    st.session_state.esercizi_scheda_temp[i]['note'] = nuova_nota if nuova_nota.strip() != "" else None
+                    st.divider()
+
+                testo_pulsante_salva = "💾 Salva Modifiche" if in_modifica else "💾 Salva Scheda Definitiva"
+                if st.button(testo_pulsante_salva, type="primary"):
+                    with engine.connect() as conn:
+                        if in_modifica:
+                            scheda_id = st.session_state.modifica_scheda_id
+                            conn.execute(sqlalchemy.text(
+                                "UPDATE Schede SET nome_scheda = :nome WHERE id = :sid AND utente_id = :uid"
+                            ), {"nome": st.session_state.nome_scheda_temp, "sid": scheda_id, "uid": st.session_state.utente_id})
+                            conn.execute(sqlalchemy.text(
+                                "DELETE FROM Scheda_Esercizi WHERE scheda_id = :sid"
+                            ), {"sid": scheda_id})
+                            conn.commit()
+                        else:
+                            conn.execute(sqlalchemy.text("""
+                                INSERT INTO Schede (utente_id, nome_scheda)
+                                VALUES (:uid, :nome)
+                            """), {"uid": st.session_state.utente_id, "nome": st.session_state.nome_scheda_temp})
+                            conn.commit()
+
+                            nuova_scheda = conn.execute(sqlalchemy.text("""
+                                SELECT id FROM Schede
+                                WHERE utente_id = :uid AND nome_scheda = :nome
+                                ORDER BY id DESC LIMIT 1
+                            """), {"uid": st.session_state.utente_id, "nome": st.session_state.nome_scheda_temp}).fetchone()
+                            scheda_id = nuova_scheda[0]
 
                         for ordine, es in enumerate(st.session_state.esercizi_scheda_temp, start=1):
                             conn.execute(sqlalchemy.text("""
@@ -294,6 +354,7 @@ with st.expander("📋 Le mie Schede"):
 
                     st.success("✅ Scheda salvata con successo!")
                     st.session_state.creazione_scheda = False
+                    st.session_state.modifica_scheda_id = None
                     del st.session_state.nome_scheda_temp
                     del st.session_state.esercizi_scheda_temp
                     st.rerun()
