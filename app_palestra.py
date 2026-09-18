@@ -368,7 +368,7 @@ with engine.connect() as conn:
     """), {"uid": st.session_state.utente_id}).fetchall()
 
 mappa_schede = {nome: sid for sid, nome in schede_disponibili}
-opzioni_sessione = list(mappa_schede.keys()) + ["Corsa", "Giorno Jolly"]
+opzioni_sessione = list(mappa_schede.keys()) + ["Corsa", "Giorno Jolly", "Altri Sport"]
 
 if not schede_disponibili:
     st.info("💡 Non hai ancora creato schede — apri '📋 Le mie Schede' sopra per crearne una, oppure usa 'Giorno Jolly' per allenarti liberamente.")
@@ -571,6 +571,78 @@ elif giorno_sel == "Giorno Jolly":
             if st.button("Reset Serie (Torna a 1)"):
                 st.session_state["_pending_input_serie"] = 1
                 st.rerun()
+                # --- 9.5 SEZIONE ALTRI SPORT ---
+elif giorno_sel == "Altri Sport":
+    st.divider()
+    sport_scelto = st.selectbox("Sport", ["Calcio", "Nuoto", "Ciclismo", "Altro"])
+
+    col1, col2 = st.columns(2)
+    durata = col1.number_input("Durata (minuti)", 0, 300, 0, key="sport_durata")
+    km = col2.number_input("Km percorsi", 0.0, 100.0, 0.0, step=0.1, key="sport_km")
+
+    col3, col4 = st.columns(2)
+    calorie = col3.number_input("Calorie", 0, 3000, 0, key="sport_calorie")
+    bpm = col4.number_input("BPM medio", 0, 220, 0, key="sport_bpm")
+
+    ritmo = st.text_input("Ritmo medio (opzionale, es. 5:30 min/km)", key="sport_ritmo")
+    note_sport = st.text_input("Note", key="sport_note")
+
+    if st.button("SALVA SESSIONE"):
+        with engine.connect() as conn:
+            conn.execute(sqlalchemy.text("""
+                INSERT INTO sessioni_sport
+                    (data_allenamento, sport, durata_minuti, km_percorsi, calorie, ritmo_medio, bpm_medio, note, utente_id)
+                VALUES (:d, :sport, :dur, :km, :cal, :rit, :bpm, :n, :uid)
+            """), {
+                "d": data_sel, "sport": sport_scelto,
+                "dur": durata if durata > 0 else None,
+                "km": km if km > 0 else None,
+                "cal": calorie if calorie > 0 else None,
+                "rit": ritmo if ritmo.strip() != "" else None,
+                "bpm": bpm if bpm > 0 else None,
+                "n": note_sport, "uid": st.session_state.utente_id
+            })
+            conn.commit()
+        st.success("Sessione salvata!")
+        st.rerun()
+
+    # --- Storico ---
+    st.divider()
+    st.subheader("📋 Storico Altri Sport")
+    try:
+        with engine.connect() as conn:
+            df_sport = pd.read_sql(sqlalchemy.text("""
+                SELECT id, data_allenamento AS Data, sport AS Sport,
+                       durata_minuti AS Durata, km_percorsi AS Km,
+                       calorie AS Calorie, ritmo_medio AS Ritmo, bpm_medio AS BPM, note AS Note
+                FROM sessioni_sport
+                WHERE utente_id = :uid
+                ORDER BY data_allenamento DESC
+                LIMIT 30
+            """), conn, params={"uid": st.session_state.utente_id})
+
+        if not df_sport.empty:
+            df_sport.insert(0, "Seleziona", False)
+            modificato_sport = st.data_editor(
+                df_sport, hide_index=True,
+                column_config={"id": None, "Seleziona": st.column_config.CheckboxColumn()},
+                disabled=["Data", "Sport", "Durata", "Km", "Calorie", "Ritmo", "BPM", "Note"],
+                use_container_width=True, key="editor_sport"
+            )
+            ids_da_eliminare = modificato_sport[modificato_sport["Seleziona"] == True]["id"].tolist()
+            if ids_da_eliminare:
+                if st.button(f"🗑️ ELIMINA {len(ids_da_eliminare)} RIGHE", type="primary", key="elimina_sport"):
+                    with engine.connect() as conn:
+                        for id_del in ids_da_eliminare:
+                            conn.execute(sqlalchemy.text(
+                                "DELETE FROM sessioni_sport WHERE id = :id AND utente_id = :uid"
+                            ), {"id": id_del, "uid": st.session_state.utente_id})
+                        conn.commit()
+                    st.rerun()
+        else:
+            st.info("Nessuna sessione registrata ancora.")
+    except Exception as e:
+        st.error(f"Errore: {e}")
 
 # --- 10. SEZIONE PALESTRA (scheda personalizzata) ---
 else:
