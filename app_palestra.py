@@ -3,6 +3,7 @@ import pandas as pd
 import sqlalchemy
 import plotly.graph_objects as go
 import time
+import uuid
 from datetime import date
 
 # --- 1. CONFIGURAZIONE PAGINA & STILE ---
@@ -58,6 +59,12 @@ def zona_velocita(v):
         return "🟢 Velocità-Forza (35-50% 1RM)"
     else:
         return "🔵 Forza Iniziale (0-35% 1RM)"
+
+def formatta_reps(reps, reps_max):
+    """Ritorna '8-12' se c'è un range, altrimenti '8'."""
+    if reps_max and reps_max > reps:
+        return f"{reps}-{reps_max}"
+    return f"{reps}"
 
 def applica_valore_in_attesa(key_widget, key_pending):
     """Se c'è un valore in attesa per questo contatore, lo applica PRIMA che il widget venga creato."""
@@ -178,7 +185,7 @@ with st.expander("📋 Le mie Schede"):
             for scheda_id, nome in schede_utente:
                 with engine.connect() as conn:
                     esercizi_scheda = conn.execute(sqlalchemy.text("""
-                        SELECT e.id, e.nome_esercizio, se.serie_n, se.ripetizioni, se.obiettivo_kg, se.note
+                        SELECT e.id, e.nome_esercizio, se.serie_n, se.ripetizioni, se.ripetizioni_max, se.obiettivo_kg, se.note
                         FROM Scheda_Esercizi se
                         JOIN Esercizi e ON se.esercizio_id = e.id
                         WHERE se.scheda_id = :sid
@@ -193,14 +200,16 @@ with st.expander("📋 Le mie Schede"):
                     st.session_state.nome_scheda_temp = nome
                     st.session_state.esercizi_scheda_temp = [
                         {
+                            "uid": uuid.uuid4().hex[:8],
                             "esercizio_id": eid,
                             "nome": enome,
                             "serie": sn,
                             "reps": rp,
+                            "reps_max": rpm,
                             "obiettivo": float(obj) if obj else None,
                             "note": nt
                         }
-                        for eid, enome, sn, rp, obj, nt in esercizi_scheda
+                        for eid, enome, sn, rp, rpm, obj, nt in esercizi_scheda
                     ]
                     st.session_state.creazione_scheda = True
                     st.rerun()
@@ -216,8 +225,8 @@ with st.expander("📋 Le mie Schede"):
                         conn.commit()
                     st.rerun()
 
-                for nome_es, serie_n, reps, obj_kg, note_es in [(r[1], r[2], r[3], r[4], r[5]) for r in esercizi_scheda]:
-                    riga = f"　{nome_es} — {serie_n}x{reps}"
+                for nome_es, serie_n, reps, reps_max, obj_kg, note_es in [(r[1], r[2], r[3], r[4], r[5], r[6]) for r in esercizi_scheda]:
+                    riga = f"　{nome_es} — {serie_n}x{formatta_reps(reps, reps_max)}"
                     if obj_kg:
                         riga += f" | 🎯 {obj_kg} kg"
                     if note_es:
@@ -271,19 +280,22 @@ with st.expander("📋 Le mie Schede"):
             opzioni_esercizi = {nome: id for id, nome in lista_esercizi}
             esercizio_scelto = st.selectbox("Esercizio", list(opzioni_esercizi.keys()), key="sel_esercizio_scheda")
 
-            col_s, col_r = st.columns(2)
+            col_s, col_r, col_rm = st.columns(3)
             serie_target = col_s.number_input("Serie", 1, 10, 3, key="serie_target_scheda")
-            reps_target = col_r.number_input("Ripetizioni", 1, 50, 8, key="reps_target_scheda")
+            reps_target = col_r.number_input("Reps min", 1, 50, 8, key="reps_target_scheda")
+            reps_max_target = col_rm.number_input("Reps max (0 = nessun range)", 0, 100, 0, key="reps_max_target_scheda")
 
             obiettivo_kg_input = st.number_input("Obiettivo Kg (opzionale)", 0.0, 300.0, 0.0, key="obiettivo_target_scheda")
             note_input = st.text_input("Note (opzionale)", key="note_target_scheda")
 
             if st.button("➕ Aggiungi alla scheda"):
                 st.session_state.esercizi_scheda_temp.append({
+                    "uid": uuid.uuid4().hex[:8],
                     "esercizio_id": opzioni_esercizi[esercizio_scelto],
                     "nome": esercizio_scelto,
                     "serie": serie_target,
                     "reps": reps_target,
+                    "reps_max": reps_max_target if reps_max_target > reps_target else None,
                     "obiettivo": obiettivo_kg_input if obiettivo_kg_input > 0 else None,
                     "note": note_input if note_input.strip() != "" else None
                 })
@@ -292,31 +304,50 @@ with st.expander("📋 Le mie Schede"):
             if st.session_state.esercizi_scheda_temp:
                 st.write("#### Esercizi nella scheda")
                 for i, es in enumerate(st.session_state.esercizi_scheda_temp):
-                    col_nome, col_s2, col_r2, col_del2 = st.columns([3, 1, 1, 1])
+                    uid = es.setdefault("uid", uuid.uuid4().hex[:8])
+
+                    col_nome, col_su, col_giu, col_del2 = st.columns([4, 1, 1, 1])
                     col_nome.write(f"**{i+1}. {es['nome']}**")
 
-                    nuova_serie = col_s2.number_input("S", 1, 10, es['serie'], key=f"edit_serie_{i}", label_visibility="collapsed")
-                    nuova_reps = col_r2.number_input("R", 1, 50, es['reps'], key=f"edit_reps_{i}", label_visibility="collapsed")
+                    if col_su.button("⬆️", key=f"su_{uid}", disabled=(i == 0)):
+                        lista = st.session_state.esercizi_scheda_temp
+                        lista[i - 1], lista[i] = lista[i], lista[i - 1]
+                        st.rerun()
 
-                    st.session_state.esercizi_scheda_temp[i]['serie'] = nuova_serie
-                    st.session_state.esercizi_scheda_temp[i]['reps'] = nuova_reps
+                    if col_giu.button("⬇️", key=f"giu_{uid}", disabled=(i == len(st.session_state.esercizi_scheda_temp) - 1)):
+                        lista = st.session_state.esercizi_scheda_temp
+                        lista[i + 1], lista[i] = lista[i], lista[i + 1]
+                        st.rerun()
 
-                    if col_del2.button("🗑️", key=f"del_temp_{i}"):
+                    if col_del2.button("🗑️", key=f"del_{uid}"):
                         st.session_state.esercizi_scheda_temp.pop(i)
                         st.rerun()
+
+                    col_s2, col_r2, col_rm2 = st.columns(3)
+                    nuova_serie = col_s2.number_input("Serie", 1, 10, es['serie'], key=f"serie_{uid}")
+                    nuova_reps = col_r2.number_input("Reps min", 1, 50, es['reps'], key=f"reps_{uid}")
+                    nuova_reps_max = col_rm2.number_input(
+                        "Reps max (0 = no range)", 0, 100,
+                        int(es.get('reps_max') or 0),
+                        key=f"repsmax_{uid}"
+                    )
+
+                    es['serie'] = nuova_serie
+                    es['reps'] = nuova_reps
+                    es['reps_max'] = nuova_reps_max if nuova_reps_max > nuova_reps else None
 
                     col_obj, col_note = st.columns(2)
                     nuovo_obj = col_obj.number_input(
                         "Obiettivo Kg", 0.0, 300.0,
                         float(es['obiettivo']) if es['obiettivo'] else 0.0,
-                        key=f"edit_obj_{i}"
+                        key=f"obj_{uid}"
                     )
                     nuova_nota = col_note.text_input(
                         "Note", value=es['note'] if es['note'] else "",
-                        key=f"edit_nota_{i}"
+                        key=f"nota_{uid}"
                     )
-                    st.session_state.esercizi_scheda_temp[i]['obiettivo'] = nuovo_obj if nuovo_obj > 0 else None
-                    st.session_state.esercizi_scheda_temp[i]['note'] = nuova_nota if nuova_nota.strip() != "" else None
+                    es['obiettivo'] = nuovo_obj if nuovo_obj > 0 else None
+                    es['note'] = nuova_nota if nuova_nota.strip() != "" else None
                     st.divider()
 
                 testo_pulsante_salva = "💾 Salva Modifiche" if in_modifica else "💾 Salva Scheda Definitiva"
@@ -347,9 +378,9 @@ with st.expander("📋 Le mie Schede"):
 
                         for ordine, es in enumerate(st.session_state.esercizi_scheda_temp, start=1):
                             conn.execute(sqlalchemy.text("""
-                                INSERT INTO Scheda_Esercizi (scheda_id, esercizio_id, serie_n, ripetizioni, ordine, obiettivo_kg, note)
-                                VALUES (:sid, :eid, :s, :r, :o, :obj, :n)
-                            """), {"sid": scheda_id, "eid": es["esercizio_id"], "s": es["serie"], "r": es["reps"], "o": ordine, "obj": es["obiettivo"], "n": es["note"]})
+                                INSERT INTO Scheda_Esercizi (scheda_id, esercizio_id, serie_n, ripetizioni, ripetizioni_max, ordine, obiettivo_kg, note)
+                                VALUES (:sid, :eid, :s, :r, :rm, :o, :obj, :n)
+                            """), {"sid": scheda_id, "eid": es["esercizio_id"], "s": es["serie"], "r": es["reps"], "rm": es.get("reps_max"), "o": ordine, "obj": es["obiettivo"], "n": es["note"]})
                         conn.commit()
 
                     st.success("✅ Scheda salvata con successo!")
@@ -571,7 +602,8 @@ elif giorno_sel == "Giorno Jolly":
             if st.button("Reset Serie (Torna a 1)"):
                 st.session_state["_pending_input_serie"] = 1
                 st.rerun()
-                # --- 9.5 SEZIONE ALTRI SPORT ---
+
+# --- 9.5 SEZIONE ALTRI SPORT ---
 elif giorno_sel == "Altri Sport":
     st.divider()
     sport_scelto = st.selectbox("Sport", ["Calcio", "Nuoto", "Ciclismo", "Altro"])
@@ -651,18 +683,18 @@ else:
 
     with engine.connect() as conn:
         esercizi_scheda_sel = conn.execute(sqlalchemy.text("""
-            SELECT e.id, e.nome_esercizio, se.serie_n, se.ripetizioni, se.obiettivo_kg, se.note, e.link_video
+            SELECT e.id, e.nome_esercizio, se.serie_n, se.ripetizioni, se.obiettivo_kg, se.note, e.link_video, se.ripetizioni_max
             FROM Scheda_Esercizi se
             JOIN Esercizi e ON se.esercizio_id = e.id
             WHERE se.scheda_id = :sid
             ORDER BY se.ordine ASC
         """), {"sid": scheda_id_sel}).fetchall()
 
-    mappa_esercizi_scheda = {nome: (eid, sn, rp, obj, nt, video) for eid, nome, sn, rp, obj, nt, video in esercizi_scheda_sel}
+    mappa_esercizi_scheda = {nome: (eid, sn, rp, obj, nt, video, rpm) for eid, nome, sn, rp, obj, nt, video, rpm in esercizi_scheda_sel}
     esercizio_sel = st.selectbox("Esercizio", list(mappa_esercizi_scheda.keys()))
 
-    _, serie_target_sel, reps_target_sel, obiettivo_sel, note_sel, video_sel = mappa_esercizi_scheda[esercizio_sel]
-    info_testo = f"📋 **{esercizio_sel}** — target: {serie_target_sel}x{reps_target_sel}"
+    _, serie_target_sel, reps_target_sel, obiettivo_sel, note_sel, video_sel, reps_max_sel = mappa_esercizi_scheda[esercizio_sel]
+    info_testo = f"📋 **{esercizio_sel}** — target: {serie_target_sel}x{formatta_reps(reps_target_sel, reps_max_sel)}"
     if obiettivo_sel:
         info_testo += f" | 🎯 Obiettivo: {obiettivo_sel} kg"
     if note_sel:
