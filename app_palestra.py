@@ -6,6 +6,7 @@ import time
 import uuid
 import json
 import secrets
+import base64
 from datetime import date
 
 # --- 1. CONFIGURAZIONE PAGINA & STILE ---
@@ -108,6 +109,46 @@ def avanza_contatore(key_widget, key_pending):
     if nuovo_valore > 30:
         nuovo_valore = 1
     st.session_state[key_pending] = nuovo_valore
+
+# --- 3.05 BANNER SCHERMATA DI LOGIN (disegnato nel codice, nessun file esterno) ---
+BANNER_SVG = """
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 210">
+  <defs>
+    <linearGradient id="g" gradientUnits="userSpaceOnUse" x1="40" y1="0" x2="560" y2="0">
+      <stop offset="0" stop-color="#1D4ED8"/>
+      <stop offset="0.5" stop-color="#60A5FA"/>
+      <stop offset="1" stop-color="#1D4ED8"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#3B82F6" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#3B82F6" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow" x="-20%" y="-40%" width="140%" height="180%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <ellipse cx="300" cy="95" rx="280" ry="85" fill="url(#halo)"/>
+  <g filter="url(#glow)" fill="none" stroke="url(#g)" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="40" y1="95" x2="560" y2="95" stroke-width="8"/>
+    <rect x="128" y="35" width="26" height="120" rx="8" stroke-width="5" fill="#0B1120"/>
+    <rect x="160" y="50" width="20" height="90" rx="7" stroke-width="5" fill="#0B1120"/>
+    <rect x="184" y="68" width="14" height="54" rx="5" stroke-width="4" fill="#0B1120"/>
+    <rect x="446" y="35" width="26" height="120" rx="8" stroke-width="5" fill="#0B1120"/>
+    <rect x="420" y="50" width="20" height="90" rx="7" stroke-width="5" fill="#0B1120"/>
+    <rect x="402" y="68" width="14" height="54" rx="5" stroke-width="4" fill="#0B1120"/>
+    <line x1="230" y1="95" x2="370" y2="95" stroke-width="12"/>
+  </g>
+  <text x="300" y="192" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" letter-spacing="7" fill="#3B82F6">ALLENATI · REGISTRA · MIGLIORA</text>
+</svg>
+"""
+
+def mostra_banner():
+    b64 = base64.b64encode(BANNER_SVG.encode("utf-8")).decode("ascii")
+    st.markdown(
+        f'<img src="data:image/svg+xml;base64,{b64}" style="width:100%; margin-top:20px;">',
+        unsafe_allow_html=True
+    )
 
 # --- 3.1 LETTURE IN CACHE (meno chiamate al database) ---
 @st.cache_data(ttl=600, show_spinner=False)
@@ -322,6 +363,8 @@ if st.session_state.utente_id is None:
 
             if utente_ok:
                 entra(utente_ok[0], utente_ok[1])
+
+    mostra_banner()
     st.stop()
 
 UID = st.session_state.utente_id
